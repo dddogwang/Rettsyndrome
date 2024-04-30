@@ -1,9 +1,10 @@
+print("🥁 PYTHON SCRIPT START", flush=True)
 # 0. Import Libraries and Mount Drive
-print("0. Import Libraries and Mount Drive", flush=True)
+print("🚀 0. Import Libraries and Mount Drive", flush=True)
 import warnings
 import logging
 warnings.filterwarnings("ignore")
-import os,cv2,sys
+import os, cv2, sys, argparse
 from skimage import io
 from tqdm import tqdm
 from scipy import stats
@@ -13,8 +14,9 @@ import matplotlib.pyplot as plt
 import skimage
 from skimage.measure import label, regionprops
 import tensorflow as tf
+from keras.models import *
 import keras
-tf.get_logger().setLevel(logging.ERROR)
+logging.getLogger('tensorflow').setLevel(logging.ERROR)
 
 from imgaug import augmenters as iaa
 from datetime import timedelta
@@ -35,34 +37,43 @@ from root.Mask_RCNN.mrcnn.model import log
 import nucleus
 print("##########################################################", flush=True)
 
-imagepath=sys.argv[1]
-imagename=sys.argv[2]
-savepath=sys.argv[3]
-weightpath=sys.argv[4]
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--imagetype", type=str, default="ctrl")
+    parser.add_argument("--imagepath", type=str, default="/home/acd13264yb/DDDog/Datasets/240420Rettsyndrome/deconv/ctrl/")
+    parser.add_argument("--imagename", type=str, default="CTRL HiPSC_1_Dapi_488_CTCF_555H3K27AC006 - Deconvolved 3 iterations, Type Richardson-Lucy_XY001.tif")
+    parser.add_argument("--save_segment_path", type=str, default="./results/")
+    parser.add_argument("--save_cell_path", type=str, default="/home/acd13264yb/DDDog/Datasets/240420Rettsyndrome/SingeleCell/deconv/")
+    parser.add_argument("--weightpath", type=str, default=None)
+    args = parser.parse_args()
+
+imagetype = args.imagetype
+imagepath = args.imagepath
+imagename = args.imagename
+save_segment_path = args.save_segment_path
+save_segment_name = f"{save_segment_path}/{imagename[:-4]}_segment.png"
+save_cell_path = args.save_cell_path
+weightpath = args.weightpath
 print("imagepath is ",imagepath, flush=True)
 print("imagename is ",imagename, flush=True)
-print("savepath is ",savepath, flush=True)
+print("save_segment_path is ",save_segment_path, flush=True)
+print("save_segment_name is ",save_segment_name, flush=True)
+print("save_cell_path    is ",save_cell_path, flush=True)
 
-def gamma_img(gamma, img):
-    gamma_cvt = np.zeros((256,1), dtype=np.uint8)
-    for i in range(256):
-        gamma_cvt[i][0] = 255*(float(i)/255)**(1.0/gamma)
-    return cv2.LUT(img, gamma_cvt)
 
 # 1. Load and Process Images
-print("1. Load and Process Images", flush=True)
-img_origin = io.imread(imagepath)
-# img_uint8 = img_origin - img_origin.min()
-# img_uint8 = img_uint8 / (img_uint8.max() - img_uint8.min())
-# img_uint8 *= 255
+print("🚀 1. Load and Process Images", flush=True)
+loadpath = f"{imagepath}/{imagename}"
+img_origin = io.imread(loadpath)
 b = img_origin[:,:,2]
-img_hoechst = cv2.merge([b,b,b])
-# img_hoechst = gamma_img(0.7, img_hoechst)
-
+img_dapi = cv2.merge([b,b,b])
+img_dapi *= int(255/img_dapi.max())
+print(f"Load Images {loadpath}", flush=True)
 print("##########################################################", flush=True)
 
+
 # 2. Configuration
-print("2. Configuration", flush=True)
+print("🚀 2. Configuration", flush=True)
 class NucleusInferenceConfig(nucleus.NucleusConfig):
     GPU_COUNT = 1
     IMAGES_PER_GPU = 1
@@ -76,14 +87,15 @@ class NucleusInferenceConfig(nucleus.NucleusConfig):
     
     BACKBONE = "resnet50"
     
-    MEAN_PIXEL = np.mean(img_hoechst,axis=(0,1))
+    MEAN_PIXEL = np.mean(img_dapi,axis=(0,1))
     
     USE_MINI_MASK = True
     MINI_MASK_SHAPE = (100, 100)
 print("##########################################################", flush=True)
-        
+
+
 # 3. Run the Network
-print("3. Run the Network", flush=True)
+print("🚀 3. Run the Network", flush=True)
 Weights = "Kaggle"
 if Weights == "Kaggle":
     weights_path = weightpath+'/mask_rcnn_kaggle_v1.h5' 
@@ -94,18 +106,19 @@ print("weights_path : ", weights_path)
 config = NucleusInferenceConfig()
 model = modellib.MaskRCNN(mode="inference", config=config, model_dir=weights_path)
 model.load_weights(weights_path, by_name=True)
-result = model.detect([img_hoechst], verbose=0)[0]
+result = model.detect([img_dapi], verbose=0)[0]
 
 mask, bbox, class_ids = result["masks"], result["rois"], result["class_ids"]
 print("Origin shape: ", img_origin.shape, flush=True)
-log("image", img_hoechst)
+log("image", img_dapi)
 log("mask", mask)
 log("class_ids", class_ids)
 log("bbox", bbox)
 print("##########################################################", flush=True)
 
+
 # 4. post processing
-print("4. post processing", flush=True)
+print("🚀 4. post processing", flush=True)
 ## 4.1 remove outliers by roundness
 print("# 4.1 remove outliers by roundness", flush=True)
 def compute_roundness(label_image):
@@ -125,7 +138,7 @@ print("len(total_roundness): ",len(total_roundness), flush=True)
 roundness_outliers = []
 roundness_zscore = np.abs(stats.zscore(total_roundness))
 for c in range(bbox.shape[0]):
-    roundness_outliers.append((total_roundness[c])<0.7)
+    roundness_outliers.append((total_roundness[c])<0.68)
 print("roundness_outliers: ", flush=True)
 for c in range(len(total_roundness)):
     if roundness_outliers[c]:
@@ -139,7 +152,7 @@ print("len(total_masks_area): ",len(total_masks_area))
 masks_outliers = []
 masks_zscore = np.abs(stats.zscore(total_masks_area))
 for c in range(bbox.shape[0]):
-    masks_outliers.append(((total_masks_area[c])<30000) or (masks_zscore[c]>2.5))
+    masks_outliers.append(((total_masks_area[c])<20000) or (masks_zscore[c]>2.5))
 print("masks_outliers: ", flush=True)
 for c in range(len(total_masks_area)):
     if masks_outliers[c]:
@@ -175,26 +188,24 @@ F_total_masks=np.transpose(np.array(F_total_masks),(1,2,0))
 F_total_class_ids=np.ones(F_total_boxes.shape[0], dtype=np.int32)
 print("total_boxes.shape: ",F_total_boxes.shape, flush=True)
 print("total_masks.shape: ",F_total_masks.shape, flush=True)
-
-print("##########################################################", flush=True)
 print("visualize.display_instances", flush=True)
-img_uint8 = io.imread(imagepath)
-img_uint8[img_uint8>255]=255
-b = img_uint8[:,:,2].astype(np.uint8)
-img_hoechst_unit8 = cv2.merge([b,b,b])
-visualize.display_instances_save(img_hoechst_unit8, F_total_boxes, F_total_masks, F_total_class_ids, ["BG","nucleus"], 
-                                     savename=sys.argv[5]+"/"+imagename[:-8]+".png", figsize=(20, 20))
-print("save maskrcnn segmentation results as ", sys.argv[5]+"/"+imagename[:-8]+".png", flush=True)
-
+visualize.display_instances_save(img_dapi, F_total_boxes, F_total_masks, F_total_class_ids, ["BG","nucleus"], savename=save_segment_name, figsize=(20, 20))
+print("save maskrcnn segmentation results as ", save_segment_name, flush=True)
 print("##########################################################", flush=True)
-print("5. Split and save each cell", flush=True)
 
+# 5. Split and save each cell
+print("🚀 5. Split and save each cell", flush=True)
 for nn in range(F_total_boxes.shape[0]):
     bb = F_total_boxes[nn]
-    mmask = F_total_masks[:,:,nn][bb[0]:bb[2], bb[1]:bb[3]].astype(np.uint16)
+    mmask = F_total_masks[:,:,nn][bb[0]:bb[2], bb[1]:bb[3]].astype(np.uint8)
     mmask = cv2.merge([mmask,mmask,mmask])
     iimg = img_origin[bb[0]:bb[2], bb[1]:bb[3]]
+
     iimg = np.multiply(iimg, mmask)
-    savename=imagename[:-8]+"_"+str(nn)+'.tif'
-    cv2.imwrite(savepath+"/"+savename, iimg)
-    print("save name with ", savepath+"/"+savename, flush=True)
+    rr,gg,bb = cv2.split(iimg)
+    save_cell_name = f"{imagename[:-4]}_single{nn:02}"
+    cv2.imwrite(f"{save_cell_path}/All/{imagetype}/{save_cell_name}_All.tif", iimg)
+    cv2.imwrite(f"{save_cell_path}/H3K27ac/{imagetype}/{save_cell_name}_H3K27AC.tif", rr)
+    cv2.imwrite(f"{save_cell_path}/CTCF/{imagetype}/{save_cell_name}_CTCF.tif", gg)
+    cv2.imwrite(f"{save_cell_path}/Dapi/{imagetype}/{save_cell_name}_Dapi.tif", bb)
+    print("Save name with ", f"{save_cell_path}/All/{imagetype}/{save_cell_name}_All.tif", flush=True)

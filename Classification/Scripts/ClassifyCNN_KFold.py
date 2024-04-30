@@ -1,8 +1,7 @@
-print("##########################################################", flush=True)
-
+print("🥁 PYTHON SCRIPT START", flush=True)
 # 0. Import Libraries and Mount Drive
-print("0. Import Libraries and Mount Drive", flush=True)
-import cv2,os,sys
+print("🚀 0. Import Libraries and Mount Drive", flush=True)
+import cv2,os,argparse
 from skimage import io
 from PIL import Image
 import numpy as np
@@ -30,19 +29,31 @@ else:
     print("torch.device(cpu)", flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
-homepath = sys.argv[1]
-datatype = sys.argv[2]
-restype = sys.argv[3]
-print("This is "+restype, flush=True)
-print(datatype, flush=True)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--stain_type", type=str, default="H3K27ac")
+    parser.add_argument("--model_type", type=str, default="Resnet10_noavg")
+    parser.add_argument("--image_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/Datasets")
+    parser.add_argument("--save_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/results")
+    parser.add_argument("--n_epochs", type=int, default=200)
+    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--learning_rate", type=float, default=0.0001)
+    args = parser.parse_args()
+
+stain_type = args.stain_type
+model_type = args.model_type
+image_path = args.image_path
+save_path = args.save_path
+
 # 1. Load and Process Images
-print("1. Load and Process Images", flush=True)
-X_Ctrl = np.load(homepath+"/Datasets/Ctrl_"+datatype+".npy",allow_pickle=True)
-X_VPA = np.load(homepath+"/Datasets/VPA_"+datatype+".npy",allow_pickle=True)
+print("🚀 1. Load and Process Images", flush=True)
+X_Ctrl = np.load(f"{image_path}/CTRL_{stain_type}.npy",allow_pickle=True)
+X_Rett = np.load(f"{image_path}/RETT_{stain_type}.npy",allow_pickle=True)
 y_Ctrl = torch.zeros(len(X_Ctrl), dtype=torch.int64)
-y_VPA = torch.ones(len(X_VPA), dtype=torch.int64)
-X = np.concatenate((X_Ctrl, X_VPA), axis = 0)
-y = torch.cat((y_Ctrl, y_VPA), 0)
+y_Rett = torch.ones(len(X_Rett), dtype=torch.int64)
+X = np.concatenate((X_Ctrl, X_Rett), axis = 0)
+y = torch.cat((y_Ctrl, y_Rett), 0)
 class cell_dataset(Dataset):
     def __init__(self, x, y):
         self.x = x
@@ -56,8 +67,8 @@ dataset = cell_dataset(X, y)
 print("done", flush=True)
 print("##########################################################", flush=True)
 
-print("3. Develop model", flush=True)
-if restype=="Resnet10_noavg":
+print("🚀 2. Develop model", flush=True)
+if model_type=="Resnet10_noavg":
     class ResNet(nn.Module):
         def __init__(self):
             super(ResNet,self).__init__()
@@ -65,12 +76,12 @@ if restype=="Resnet10_noavg":
             self.resnet.layer3 = nn.Sequential()
             self.resnet.layer4 = nn.Sequential()
             self.resnet.avgpool = nn.Sequential()
-            self.resnet.fc = nn.Linear(128*75*75, 2)   
+            self.resnet.fc = nn.Linear(128*63*63, 2)   
         def forward(self, x):
             x = self.resnet(x)
-            x = nn.Softmax(dim=1)(x)
+            # x = nn.Softmax(dim=1)(x)
             return x
-elif restype=="Resnet10":
+elif model_type=="Resnet10":
     class ResNet(nn.Module):
         def __init__(self):
             super(ResNet,self).__init__()
@@ -80,9 +91,9 @@ elif restype=="Resnet10":
             self.resnet.fc = nn.Linear(128, 2)   
         def forward(self, x):
             x = self.resnet(x)
-            x = nn.Softmax(dim=1)(x)
+            # x = nn.Softmax(dim=1)(x)
             return x
-elif restype=="Resnet18":
+elif model_type=="Resnet18":
     class ResNet(nn.Module):
         def __init__(self):
             super(ResNet,self).__init__()
@@ -90,12 +101,12 @@ elif restype=="Resnet18":
             self.resnet.fc = nn.Linear(512, 2)   
         def forward(self, x):
             x = self.resnet(x)
-            x = nn.Softmax(dim=1)(x)
+            # x = nn.Softmax(dim=1)(x)
             return x     
 print("done", flush=True)
 print("##########################################################", flush=True)
 
-print("4. Define Training and Validation", flush=True)
+print("🚀 3. Define Training and Validation", flush=True)
 def train(model,device,dataloader_train,loss_function,optimizer):
     losses_train = []
     n_train = 0
@@ -107,7 +118,7 @@ def train(model,device,dataloader_train,loss_function,optimizer):
         model.zero_grad()  # 勾配の初期化
         x = x.to(device)  # テンソルをGPUに移動
         y = y.to(device)
-        output = model.forward(x)  # 順伝播
+        output = model(x)  # 順伝播
         loss = loss_function(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
         loss.backward()  # 誤差の逆伝播
         optimizer.step()  # パラメータの更新
@@ -123,7 +134,7 @@ def valid(model,device,dataloader_valid,loss_function):
         n_val += y.size()[0]
         x = x.to(device)  # テンソルをGPUに移動
         y = y.to(device)
-        output = model.forward(x)  # 順伝播
+        output = model(x)  # 順伝播
         loss = loss_function(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
         acc_val += (output.argmax(1) == y[:,1]).float().sum().item()
         losses_valid.append(loss.tolist())
@@ -131,11 +142,11 @@ def valid(model,device,dataloader_valid,loss_function):
 print("done", flush=True)
 print("##########################################################", flush=True)
 
-print("5. Train by KFold of Cross Validation", flush=True)
+print("🚀 4. Train by KFold of Cross Validation", flush=True)
 n_splits=5
 splits=KFold(n_splits,shuffle=True,random_state=42)
-batch_size = 128
-n_epochs = 500
+batch_size = args.batch_size
+n_epochs = args.n_epochs
 history = {'loss_train': [], 'loss_valid': [],'acc_train':[],'acc_valid':[]}
 for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(len(dataset)))):
     print('Fold {}'.format(fold + 1), flush=True)
@@ -148,8 +159,12 @@ for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(len(dataset))
     if (device.type == 'cuda') and (ngpu > 1):
         model = nn.DataParallel(model, list(range(ngpu)))
     model.avgpool = nn.AdaptiveAvgPool2d(1)
-    loss_function = nn.BCELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
+    weights = torch.tensor([(len(X_Ctrl)+len(X_Rett))/len(X_Ctrl), 
+                            (len(X_Ctrl)+len(X_Rett))/len(X_Rett)]).cuda()
+    # loss_function = nn.BCELoss()
+    # loss_function = nn.CrossEntropyLoss(weight=weights)
+    loss_function = nn.BCEWithLogitsLoss(pos_weight=weights)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
     for epoch in range(n_epochs):
         loss_train, acc_train = train(model,device,dataloader_train,loss_function,optimizer)
@@ -161,15 +176,15 @@ for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(len(dataset))
         history['loss_valid'].append(loss_valid)
         history['acc_train'].append(acc_train)
         history['acc_valid'].append(acc_valid)
-    savemodel = homepath+"/Models/"+restype+"_"+datatype+"/"+"Fold"+str(fold)+".pkl"
+    savemodel = f"{save_path}/{stain_type}_{model_type}_Fold{str(fold)}.pkl"
     for param in model.parameters():
         param.requires_grad = True
         torch.save(model.module.resnet.state_dict(),savemodel)
-    print("saved model as "+savemodel, flush=True)
+    print("🏵️ saved model as "+savemodel, flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
 
-print("6. plot the figure of training process", flush=True)
+print("🚀 5. plot the figure of training process", flush=True)
 loss_train_avg = np.zeros(n_epochs)
 loss_valid_avg = np.zeros(n_epochs)
 acc_train_avg = np.zeros(n_epochs)
@@ -184,27 +199,27 @@ for num in range(n_splits):
     acc_train_avg+=acc_train
     acc_valid_avg+=acc_valid
     name_title="Fold_"+str(num)+'_Training and Validation accuracy'
-    savepath = homepath+"/results/2023/Train/"+restype+"_"+datatype+"/"+name_title+".png"
+    savepath = f"{save_path}/{name_title}.png"
     plt.figure(figsize=(12, 8))
     plt.ylim(0,1.0)
     plt.plot(range(1,n_epochs+1), acc_train, 'b', label='Training accuracy')  
     plt.plot(range(1,n_epochs+1), acc_valid, 'r', label='Validation accuracy')
     plt.title(name_title)
     plt.savefig(savepath)
-    print("Saved output as , ", savepath, flush=True)
+    print("🌺 Saved output as , ", savepath, flush=True)
 loss_train_avg = loss_train_avg/n_splits
 loss_valid_avg = loss_valid_avg/n_splits
 acc_train_avg = acc_train_avg/n_splits
 acc_valid_avg = acc_valid_avg/n_splits
 name_title="Average Training and Validation accuracy"
-savepath = homepath+"/results/2023/Train/"+restype+"_"+datatype+"/"+name_title+".png"
+savepath = f"{save_path}/{name_title}.png"
 plt.figure(figsize=(12, 8))
 plt.ylim(0,1.0)
 plt.plot(range(1,n_epochs+1), acc_train_avg, 'b', label='Training accuracy')  
 plt.plot(range(1,n_epochs+1), acc_valid_avg, 'r', label='Validation accuracy')
 plt.title(name_title)
 plt.savefig(savepath)
-print("Saved output as , ", savepath, flush=True)
+print("🌸 Saved output as , ", savepath, flush=True)
 print("##########################################################", flush=True)
 print(history, flush=True)
 print("done", flush=True)
