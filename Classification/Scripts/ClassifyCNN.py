@@ -2,7 +2,7 @@ print("##########################################################", flush=True)
 
 # 0. Import Libraries and Mount Drive
 print("0. Import Libraries and Mount Drive", flush=True)
-import cv2,os,sys
+import cv2,os,argparse
 from skimage import io
 from PIL import Image
 import numpy as np
@@ -30,19 +30,29 @@ else:
     print("torch.device(cpu)", flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
-homepath = sys.argv[1]
-datatype = sys.argv[2]
-restype = sys.argv[3]
-print("This is "+restype, flush=True)
-print(datatype, flush=True)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--stain_type", type=str, default="H3K27ac")
+    parser.add_argument("--model_type", type=str, default="Resnet10_noavg")
+    parser.add_argument("--image_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/Datasets")
+    parser.add_argument("--save_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/results")
+    parser.add_argument("--n_epochs", type=int, default=200)
+    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--learning_rate", type=float, default=0.0001)
+    args = parser.parse_args()
+
+stain_type = args.stain_type
+model_type = args.model_type
+image_path = args.image_path
+save_path = args.save_path
 # 1. Load and Process Images
 print("1. Load and Process Images", flush=True)
-X_Ctrl = np.load(homepath+"/Datasets/Ctrl_"+datatype+".npy",allow_pickle=True)
-X_VPA = np.load(homepath+"/Datasets/VPA_"+datatype+".npy",allow_pickle=True)
+X_Ctrl = np.load(f"{image_path}/CTRL_{stain_type}.npy",allow_pickle=True)
+X_Rett = np.load(f"{image_path}/RETT_{stain_type}.npy",allow_pickle=True)
 y_Ctrl = torch.zeros(len(X_Ctrl), dtype=torch.int64)
-y_VPA = torch.ones(len(X_VPA), dtype=torch.int64)
-X = np.concatenate((X_Ctrl, X_VPA), axis = 0)
-y = torch.cat((y_Ctrl, y_VPA), 0)
+y_Rett = torch.ones(len(X_Rett), dtype=torch.int64)
+X = np.concatenate((X_Ctrl, X_Rett), axis = 0)
+y = torch.cat((y_Ctrl, y_Rett), 0)
 class cell_dataset(Dataset):
     def __init__(self, x, y):
         self.x = x
@@ -77,7 +87,7 @@ print("done", flush=True)
 print("##########################################################", flush=True)
 
 print("3. Develop model", flush=True)
-if restype=="Resnet10":
+if model_type=="Resnet10":
     class ResNet(nn.Module):
         def __init__(self):
             super(ResNet,self).__init__()
@@ -90,7 +100,7 @@ if restype=="Resnet10":
             x = self.resnet(x)
             x = nn.Softmax(dim=1)(x)
             return x
-elif restype=="Resnet10_max2avg":
+elif model_type=="Resnet10_max2avg":
     class ResNet(nn.Module):
         def __init__(self):
             super(ResNet,self).__init__()
@@ -104,7 +114,7 @@ elif restype=="Resnet10_max2avg":
             x = self.resnet(x)
             x = nn.Softmax(dim=1)(x)
             return x
-elif restype=="Resnet18":
+elif model_type=="Resnet18":
     class ResNet(nn.Module):
         def __init__(self):
             super(ResNet,self).__init__()
@@ -175,22 +185,23 @@ for epoch in range(n_epochs):
     history['loss_valid'].append(loss_valid)
     history['acc_train'].append(acc_train)
     history['acc_valid'].append(acc_valid)
+savemodel = f"{save_path}/{stain_type}_{model_type}.pkl"
 for param in model.parameters():
     param.requires_grad = True
-    torch.save(model.module.resnet.state_dict(),homepath+"/Models/"+restype+"_"+datatype+".pkl")
-print("saved model as "+homepath+"/Models/"+restype+"_"+datatype+".pkl", flush=True)
+    torch.save(model.module.resnet.state_dict(),savemodel)
+print("🏵️ saved model as "+savemodel, flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
 print("6. plot the figure of training process", flush=True)
 name_title="Training and Validation accuracy"
-savepath = homepath+"/results/"+restype+"_"+datatype+"/"+name_title+".png"
+savepath = f"{save_path}/{name_title}.png"
 plt.figure(figsize=(12, 8))
 plt.ylim(0,1.0)
 plt.plot(range(1,n_epochs+1), history['acc_train'], 'b', label='Training accuracy')  
 plt.plot(range(1,n_epochs+1), history['acc_valid'], 'r', label='Validation accuracy')
 plt.title(name_title)
 plt.savefig(savepath)
-print("Saved output as , ", savepath, flush=True)
+print("🌺 Saved output as , ", savepath, flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
 print("5. Train by KFold of Cross Validation", flush=True)
@@ -220,9 +231,9 @@ plt.plot(fpr, tpr, marker='.')
 plt.xlabel('FPR: False positive rate')
 plt.ylabel('TPR: True positive rate')
 name_title="ROC curve"
-savepath = homepath+"/results/"+restype+"_"+datatype+"/"+name_title+".png"
+savepath = f"{save_path}/{name_title}.png"
 plt.savefig(savepath)
-print("Saved output as , ", savepath, flush=True)
+print("🌸 Saved output as , ", savepath, flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
 print(history, flush=True)

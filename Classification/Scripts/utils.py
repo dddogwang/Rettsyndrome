@@ -1,0 +1,59 @@
+import cv2
+import math
+import numpy as np
+
+def ellipse(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    thresh = cv2.threshold(gray, 0 , 255, cv2.THRESH_BINARY)[1]
+    contours = cv2.findContours(thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    contours = contours[0] if len(contours) == 2 else contours[1]
+    big_contour = max(contours, key=cv2.contourArea)
+    ellipse = cv2.fitEllipse(big_contour)
+    (xc,yc),(d1,d2),angle = ellipse
+    result = img.copy()
+    cv2.ellipse(result, ellipse, (0, 255, 0), 3)
+    xc, yc = ellipse[0]
+    cv2.circle(result, (int(xc),int(yc)), 10, (255, 255, 255), -1)
+    rmajor = max(d1,d2)/2
+    if angle > 90:
+        angle = angle - 90
+    else:
+        angle = angle + 90
+    xtop = xc + math.cos(math.radians(angle))*rmajor
+    ytop = yc + math.sin(math.radians(angle))*rmajor
+    xbot = xc + math.cos(math.radians(angle+180))*rmajor
+    ybot = yc + math.sin(math.radians(angle+180))*rmajor
+    cv2.line(result, (int(xtop),int(ytop)), (int(xbot),int(ybot)), (0, 0, 255), 3)
+    return result, angle
+
+def rectangle(img):
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    thresh = cv2.threshold(gray, 0 , 255, cv2.THRESH_BINARY)[1]
+    contours, hierarchy = cv2.findContours(thresh,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    cnt = contours[0]
+    x, y, w, h = cv2.boundingRect(cnt)
+    return x, y, w, h
+
+def rotate(img, angle):
+    (h, w) = img.shape[:2]
+    (cX, cY) = (w // 2, h // 2)
+    rotated = cv2.getRotationMatrix2D((cX, cY), angle, 1.0)
+    rotated = cv2.warpAffine(img, rotated, (w, h))
+    return rotated
+
+def ZeroPaddingResizeCV(img, size=(600, 600), interpolation=None, n=3):
+    isize = img.shape
+    ih, iw = isize[0], isize[1]
+    h, w = size[0], size[1]
+    scale = min(w / iw, h / ih)
+    new_w = int(iw * scale + 0.5)
+    new_h = int(ih * scale + 0.5)
+ 
+    img = cv2.resize(img, (new_w, new_h), interpolation)
+    if n==3:
+        new_img = np.zeros((h, w, n), np.uint8)
+        new_img[(h-new_h)//2:(h+new_h)//2, (w-new_w)//2:(w+new_w)//2] = img
+    else:
+        new_img = np.zeros((h, w), np.float32)
+        new_img[(h-new_h)//2:(h+new_h)//2, (w-new_w)//2:(w+new_w)//2] = img
+    return new_img
