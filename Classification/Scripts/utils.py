@@ -57,3 +57,29 @@ def ZeroPaddingResizeCV(img, size=(600, 600), interpolation=None, n=3):
         new_img = np.zeros((h, w), np.float32)
         new_img[(h-new_h)//2:(h+new_h)//2, (w-new_w)//2:(w+new_w)//2] = img
     return new_img
+
+def part_distribution_intensity(thresh, img):
+    mask = thresh.copy()
+    h, w = thresh.shape[:2]
+    num_parts = 5
+    for i in range(num_parts, 0, -1):
+        scale = i/5
+        new_h, new_w = int(h * scale), int(w * scale)
+        d_h, d_w = (h - new_h) // 2, (w - new_w) // 2
+        resized = cv2.resize(thresh, (new_w, new_h))
+        copy = np.zeros_like(thresh)
+        copy[d_h:d_h + new_h, d_w:d_w + new_w] = resized*2
+        copy[copy == 0] = 1
+        mask *= copy
+    for i in range(1,num_parts+1):
+        mask[mask==2**i]=(255*i/num_parts)
+
+    part_intensity=[]
+    for i in range(1,num_parts+1):
+        color = int(255*i/num_parts)
+        mask_part = cv2.inRange(mask, np.array(color, dtype=np.uint8), np.array(color, dtype=np.uint8))/255
+        img_part = img * mask_part
+        non_zero_values = img_part[np.nonzero(img_part)]
+        average = np.mean(non_zero_values)
+        part_intensity.append(average)
+    return part_intensity

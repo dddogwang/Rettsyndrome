@@ -281,3 +281,9 @@
 87. ⭕ Haralick.IMC2.Range: float
 
     第二信息测度相关性特征的平均值和范围，计算公式如下：
+
+88. Intensity.distribution.part05
+89. Intensity.distribution.part04
+90. Intensity.distribution.part03
+91. Intensity.distribution.part02
+92. Intensity.distribution.part01

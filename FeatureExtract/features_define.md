@@ -280,3 +280,9 @@
 87. Haralick.IMC2.Range: float
 
     Mean and range of the second information measure of correlation feature for GLCMs of all offsets. It is computed as follows:
+
+88. Intensity.distribution.part05
+89. Intensity.distribution.part04
+90. Intensity.distribution.part03
+91. Intensity.distribution.part02
+92. Intensity.distribution.part01

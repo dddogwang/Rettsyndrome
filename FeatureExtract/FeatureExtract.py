@@ -8,6 +8,9 @@ import pandas as pd
 from tqdm import tqdm
 from skimage.measure import label
 from matplotlib import pyplot as plt
+import sys
+sys.path.append('/groups/4/gaa50089/acd13264yb/Rettsyndrome/Classification/')
+from Scripts.utils import part_distribution_intensity
 print("done", flush=True)
 print("##########################################################", flush=True)
 
@@ -35,20 +38,32 @@ print(f"img all shape: {img_all.shape}", flush=True)
 print(f"mask all shape: {mask_all.shape}", flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
-
+labels = [
+    "Intensity.distribution.part05", 
+    "Intensity.distribution.part04", 
+    "Intensity.distribution.part03", 
+    "Intensity.distribution.part02", 
+    "Intensity.distribution.part01"
+]
 print("🚀 2. Compute and Save nuclei features", flush=True)
 # Compute and Save nuclei features
 for c in range(3):
     # Init DataFrame to save
     features_all = pd.DataFrame()
     for i in range(len(img_all)):
-        features = hf.compute_nuclei_features(im_label=mask_all[i], im_nuclei=img_all[i,:,:,c])
+        im_label = mask_all[i]
+        im_nuclei = img_all[i,:,:,c]
+        features = hf.compute_nuclei_features(im_label=im_label, im_nuclei=im_nuclei)
         features["Label"] = i
-        # Add new DataFrame to DataFrame 
+        # Add new feature intensity distribution part 5 ~ 0 to DataFrame 
+        intensity_distribution = part_distribution_intensity(im_label, im_nuclei)
+        for part, label in enumerate(labels):
+            features[label] = intensity_distribution[part]
+        # 合并 features 到 features_all
         features_all = pd.concat([features_all, features], ignore_index=True)
     # Save DataFrame as CSV
     features_name = f'{save_path}/features_{ctrl_type}_{stain_type[c]}.csv'
     features_all.to_csv(features_name, index=False)
-    print(f"🔥 Save features_all as {features_name}")
+    print(f"🔥 Save features_all as {features_name}", flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)

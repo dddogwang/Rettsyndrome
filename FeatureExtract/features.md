@@ -86,3 +86,8 @@
 85 Nucleus.Haralick.IMC1.Range
 86 Nucleus.Haralick.IMC2.Mean
 87 Nucleus.Haralick.IMC2.Range
+88 Intensity.distribution.part05
+89 Intensity.distribution.part04
+90 Intensity.distribution.part03
+91 Intensity.distribution.part02
+92 Intensity.distribution.part01
