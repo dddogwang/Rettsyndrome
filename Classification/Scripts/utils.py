@@ -58,8 +58,16 @@ def ZeroPaddingResizeCV(img, size=(600, 600), interpolation=None, n=3):
         new_img[(h-new_h)//2:(h+new_h)//2, (w-new_w)//2:(w+new_w)//2] = img
     return new_img
 
+
 def part_distribution_intensity(thresh, img):
     mask = thresh.copy()
+    # nucleus whole intensity
+    img_with_mask = mask * img
+    non_zero_values = img_with_mask[np.nonzero(img_with_mask)]
+    average = np.mean(non_zero_values)
+    feature_intensity.append(average)
+
+    # nucleus part intensity
     h, w = thresh.shape[:2]
     num_parts = 5
     for i in range(num_parts, 0, -1):
@@ -73,7 +81,6 @@ def part_distribution_intensity(thresh, img):
         mask *= copy
     for i in range(1,num_parts+1):
         mask[mask==2**i]=(255*i/num_parts)
-
     part_intensity=[]
     for i in range(1,num_parts+1):
         color = int(255*i/num_parts)
@@ -82,4 +89,11 @@ def part_distribution_intensity(thresh, img):
         non_zero_values = img_part[np.nonzero(img_part)]
         average = np.mean(non_zero_values)
         part_intensity.append(average)
-    return part_intensity
+    feature_intensity.extend(part_intensity)
+
+    # nucleus part intensity distribution
+    total_intensity = sum(part_intensity)
+    part_intensity_distribution = [x / total_intensity for x in part_intensity]
+    feature_intensity.extend(part_intensity_distribution)
+    
+    return feature_intensity
