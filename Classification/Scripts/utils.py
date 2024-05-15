@@ -59,8 +59,9 @@ def ZeroPaddingResizeCV(img, size=(600, 600), interpolation=None, n=3):
     return new_img
 
 
-def part_distribution_intensity(thresh, img):
+def nucleus_intensity_distribution(thresh, img):
     mask = thresh.copy()
+    feature_intensity = []
     # nucleus whole intensity
     img_with_mask = mask * img
     non_zero_values = img_with_mask[np.nonzero(img_with_mask)]

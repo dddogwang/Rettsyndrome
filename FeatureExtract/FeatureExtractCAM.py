@@ -10,7 +10,7 @@ from skimage.measure import label
 from matplotlib import pyplot as plt
 import sys
 sys.path.append('/groups/4/gaa50089/acd13264yb/Rettsyndrome/Classification/')
-from Scripts.utils import part_distribution_intensity
+from Scripts.utils import nucleus_intensity_distribution
 print("done", flush=True)
 print("##########################################################", flush=True)
 
@@ -46,6 +46,12 @@ print(f"mask all shape: {mask_all.shape}", flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
 labels = [
+    "Intensity.wholeNucleus"
+    "Intensity.part05", 
+    "Intensity.part04", 
+    "Intensity.part03", 
+    "Intensity.part02", 
+    "Intensity.part01",
     "Intensity.distribution.part05", 
     "Intensity.distribution.part04", 
     "Intensity.distribution.part03", 
@@ -64,7 +70,7 @@ for i in range(len(cam_all)):
     features = hf.compute_nuclei_features(im_label=im_label, im_nuclei=im_nuclei)
     features["Label"] = i
     # Add new feature intensity distribution part 5 ~ 0 to DataFrame 
-    intensity_distribution = part_distribution_intensity(im_label, im_nuclei)
+    intensity_distribution = nucleus_intensity_distribution(im_label, im_nuclei)
     for part, label in enumerate(labels):
         features[label] = intensity_distribution[part]
     # 合并 features 到 features_all
