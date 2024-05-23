@@ -48,7 +48,7 @@ print(f"mask all shape: {mask_all.shape}", flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
 labels = [
-    "Intensity.wholeNucleus"
+    "Intensity.wholeNucleus",
     "Intensity.part05", 
     "Intensity.part04", 
     "Intensity.part03", 

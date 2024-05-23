@@ -45,7 +45,7 @@ print(f"mask all shape: {mask_all.shape}", flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
 labels = [
-    "Intensity.wholeNucleus"
+    "Intensity.wholeNucleus",
     "Intensity.part05", 
     "Intensity.part04", 
     "Intensity.part03", 
@@ -74,10 +74,7 @@ for c in range(3):
         # 合并 features 到 features_all
         features_all = pd.concat([features_all, features], ignore_index=True)
     # Save DataFrame as CSV
-    if ctrl_type == "CTRL":
-        features_name = f'{save_path}/features_{ctrl_type}_{stain_type[c]}.csv'
-    elif ctrl_type == "RETT":
-        features_name = f'{save_path}/features_{ctrl_type}_{rett_type}_{stain_type[c]}.csv'
+    features_name = f'{save_path}/features_{rett_type}_{ctrl_type}_{stain_type[c]}.csv'
     features_all.to_csv(features_name, index=False)
     print(f"🔥 Save features_all as {features_name}", flush=True)
 print("done", flush=True)
