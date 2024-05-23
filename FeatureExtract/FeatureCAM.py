@@ -1,13 +1,10 @@
 print("🥁 PYTHON SCRIPT START", flush=True)
-# 0. Import Libraries and Mount Drive
 print("🚀 0. Import Libraries and Mount Drive", flush=True)
 import histomicstk.features as hf
 import numpy as np
 import cv2, argparse
 import pandas as pd
-from tqdm import tqdm
 from skimage.measure import label
-from matplotlib import pyplot as plt
 import sys
 sys.path.append('/groups/4/gaa50089/acd13264yb/Rettsyndrome/Classification/')
 from Scripts.utils import nucleus_intensity_distribution
@@ -46,7 +43,7 @@ print(f"mask all shape: {mask_all.shape}", flush=True)
 print("done", flush=True)
 print("##########################################################", flush=True)
 labels = [
-    "Intensity.wholeNucleus"
+    "Intensity.wholeNucleus",
     "Intensity.part05", 
     "Intensity.part04", 
     "Intensity.part03", 
