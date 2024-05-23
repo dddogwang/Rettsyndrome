@@ -24,6 +24,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--stain_type", type=str, default="H3K27ac")
     parser.add_argument("--ctrl_type", type=str, default="RETT")
+    parser.add_argument("--rett_type", type=str, default="HPS3042")
     parser.add_argument("--model_type", type=str, default="Resnet10_noavg")
     parser.add_argument("--image_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/Datasets")
     parser.add_argument("--model_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/results")
@@ -34,6 +35,7 @@ if __name__ == "__main__":
 stain_type = args.stain_type
 ctrl_type = args.ctrl_type
 model_type = args.model_type
+rett_type = args.rett_type
 image_path = args.image_path
 model_path = args.model_path
 cam_path = args.cam_path
@@ -76,10 +78,14 @@ print("##########################################################", flush=True)
 
 # 2. Load Data and Model
 print("🚀 2. Load Data and Model", flush=True)
-X = np.load(f"{image_path}/{ctrl_type}_{stain_type}.npy", allow_pickle=True)
+if ctrl_type=="RETT":
+    X = np.load(f"{image_path}/{ctrl_type}_{rett_type}_{stain_type}.npy", allow_pickle=True)
+elif ctrl_type=="CTRL":
+    X = np.load(f"{image_path}/{ctrl_type}_{stain_type}.npy", allow_pickle=True)
+# X = np.load(f"{image_path}/{ctrl_type}_{stain_type}.npy", allow_pickle=True)
 
 fold = 0
-loadmodel = f"{model_path}/{stain_type}_{model_type}/{stain_type}_{model_type}_Fold{str(fold)}.pkl"
+loadmodel = f"{model_path}/{rett_type}_{stain_type}_{model_type}/{rett_type}_{stain_type}_{model_type}_Fold{str(fold)}.pkl"
 if model_type=="Resnet10_noavg":
     class ResNet(nn.Module):
         def __init__(self):
@@ -128,8 +134,10 @@ total = len(X)
 print("🚀 3. SAVE CAM heatmap ", flush=True)
 if ctrl_type == "CTRL": true_y = 0
 elif ctrl_type == "RETT": true_y = 1
+
 if target_layer=="model.resnet.layer2": target_layer = model.resnet.layer2
-savename = f"{ctrl_type}_{stain_type}_{model_type}_{cam_type}"
+
+savename = f"{rett_type}_{ctrl_type}_{stain_type}_{model_type}_{cam_type}"
 count = 0
 all_cam = []
 all_img = []

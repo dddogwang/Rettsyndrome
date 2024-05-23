@@ -33,6 +33,7 @@ print("##########################################################", flush=True)
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--stain_type", type=str, default="H3K27ac")
+    parser.add_argument("--rett_type", type=str, default="HPS3042")
     parser.add_argument("--model_type", type=str, default="Resnet10_noavg")
     parser.add_argument("--image_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/Datasets")
     parser.add_argument("--save_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/results")
@@ -42,6 +43,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
 stain_type = args.stain_type
+rett_type = args.rett_type
 model_type = args.model_type
 image_path = args.image_path
 save_path = args.save_path
@@ -49,7 +51,7 @@ save_path = args.save_path
 # 1. Load and Process Images
 print("🚀 1. Load and Process Images", flush=True)
 X_Ctrl = np.load(f"{image_path}/CTRL_{stain_type}.npy",allow_pickle=True)
-X_Rett = np.load(f"{image_path}/RETT_{stain_type}.npy",allow_pickle=True)
+X_Rett = np.load(f"{image_path}/RETT_{rett_type}_{stain_type}.npy",allow_pickle=True)
 y_Ctrl = torch.zeros(len(X_Ctrl), dtype=torch.int64)
 y_Rett = torch.ones(len(X_Rett), dtype=torch.int64)
 X = np.concatenate((X_Ctrl, X_Rett), axis = 0)
@@ -176,7 +178,7 @@ for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(len(dataset))
         history['loss_valid'].append(loss_valid)
         history['acc_train'].append(acc_train)
         history['acc_valid'].append(acc_valid)
-    savemodel = f"{save_path}/{stain_type}_{model_type}_Fold{str(fold)}.pkl"
+    savemodel = f"{save_path}/{rett_type}_{stain_type}_{model_type}_Fold{str(fold)}.pkl"
     for param in model.parameters():
         param.requires_grad = True
         torch.save(model.module.resnet.state_dict(),savemodel)
