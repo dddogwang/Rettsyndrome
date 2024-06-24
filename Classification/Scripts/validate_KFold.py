@@ -183,5 +183,12 @@ for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(len(dataset))
     history['auc_valid'].append(auc_valid)
 
 print(history, flush=True)
+print("👑 history['acc_valid']")
+for acc in history['acc_valid']:
+    print(f"{acc:.3f}")
+print("👑 history['auc_valid']")
+for auc in history['auc_valid']:
+    print(f"{auc:.3f}")
+
 print("done", flush=True)
 print("##########################################################", flush=True)
