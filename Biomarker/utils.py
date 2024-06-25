@@ -275,4 +275,116 @@ def validata_boxplot(data_all, target, rett_type, feature):
     plt.savefig(savepath, dpi=300)
     plt.show()
     print(f"Saved BOX plot to {savepath}")
+
+from skimage import feature, transform
+from skimage.filters import threshold_otsu
+from scipy.ndimage import distance_transform_edt
+from skimage.segmentation import watershed
+
+def is_close(point, other_points, threshold=5):
+    """检查是否有任何点在阈值范围内"""
+    for other in other_points:
+        if np.linalg.norm(np.array(point) - np.array(other)) <= threshold:
+            return True
+    return False
+
+def filter_contours_by_proximity(contours, nuclear_contours, proximity=5):
+    """过滤掉靠近核心轮廓的轮廓"""
+    new_contours = []
+    # 展平 nuclear_contours 中的所有点
+    all_nuclear_points = [point for contour in nuclear_contours for point in contour]
+
+    for contour in contours:
+        # 检查轮廓中的任何点是否靠近核心轮廓的点
+        if not any(is_close(point, all_nuclear_points, proximity) for point in contour):
+            new_contours.append(contour)
+
+    return new_contours
+
+def compute_largest_eigenvalue(image, sigma=1):
+    nuclear = (image!=0).astype(np.uint8)
+    nuclear_scaled = transform.rescale(nuclear, 48/50)
+    nuclear_padded = np.pad(nuclear_scaled, pad_width=10, mode='constant', constant_values=0)
+
+    # 计算结构张量
+    result = feature.structure_tensor(image, sigma=sigma, order='rc')
+    # 从结构张量中获取特征值
+    eigenvalues = feature.structure_tensor_eigenvalues(result)
+    # 返回每个点的最大特征值
+    return np.max(eigenvalues, axis=0)*nuclear_padded
+
+# 使用distance_transform_edt
+def apply_h_watershed(image, min_distance=5):
+    mask = image > threshold_otsu(image)
+    # 计算距离变换
+    distance = distance_transform_edt(mask)
+    # 在距离图中找到峰值
+    local_maxi = feature.peak_local_max(distance, min_distance=min_distance, labels=mask)
+    # 将峰值的坐标转换为标记矩阵
+    if len(local_maxi)<=255:
+        markers = np.zeros_like(image, dtype=np.uint8)
+    else:
+#         print("len(local_maxi)>255")
+        markers = np.zeros_like(image, dtype=np.int32)
+    for i, (row, col) in enumerate(local_maxi):
+        markers[row, col] = i + 1
+    # 执行分水岭分割
+    labels_ws = watershed(-distance, markers, mask=mask)
+    return labels_ws
+
+
+from skimage import measure
+
+def calculate_quantitative_metrics(nucleus_image, cc_mask):
+    """
+    计算细胞核图像的量化指标。
+    
+    参数:
+    nucleus_image: numpy.ndarray, 细胞核图像，灰度图
+    cc_mask: numpy.ndarray, 染色中心的掩膜，二值图
+    
+    返回:
+    metrics: dict, 包含所有量化指标的字典
+    """
+    metrics = {}
+    
+    # 计算可见染色中心的数量
+    cc_labels = measure.label(cc_mask, connectivity=2)
+    num_cc = np.max(cc_labels)
+    metrics['chromatin_num'] = num_cc
+    
+    # 计算细胞核面积
+    nuclear_area = np.sum(nucleus_image > 0)
+    metrics['nuclear_area'] = nuclear_area
+    
+    # 计算平均chromatin面积 (CA)
+    cc_areas = [np.sum(cc_labels == i) for i in range(1, num_cc + 1)]
+#     metrics['relative_cc_areas'] = relative_cc_areas
+    metrics['chromatin_area'] = np.mean(cc_areas)
+
+    # 计算相对(核)chromatin面积和 (RCA-S)
+    metrics['RCA-S'] = np.sum(cc_areas)/nuclear_area
+
+    # 计算相对(核)chromatin面积平均 (RCA-M)
+    metrics['RCA-M'] = np.mean(cc_areas)/nuclear_area
+    
+    # 计算细胞核强度平均
+    nuclear_intensity = np.mean(nucleus_image[nucleus_image > 0])
+    metrics['nuclear_intensity'] = nuclear_intensity
+
+    # 计算平均chromatin强度平均 (CI-M)
+    cc_intensities = [np.mean(nucleus_image[cc_labels == i]) for i in range(1, num_cc + 1)]
+    metrics['chromatin_intensity'] = np.mean(cc_intensities)
+
+    # 计算相对(核)chromatin强度和 (RCI-S)
+    metrics['RCI-S'] = np.sum(cc_intensities)/nuclear_intensity
+
+    # 计算相对(核)chromatin强度平均 (RCI-M)
+    metrics['RCI-M'] = np.mean(cc_intensities)/nuclear_intensity
+    
+    # # 计算相对(核)chromatin比例 (RHF)
+    # rhf = hf * rhi
+    # metrics['relative_heterochromatin_fraction'] = rhf
+    
+    return metrics
  
