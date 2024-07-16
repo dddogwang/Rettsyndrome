@@ -35,7 +35,7 @@ for n in range(len(img)):
     camm = cam[n,:,:]
     camm = camm > threshold_otsu(camm)
 
-    max_eigenvalue = compute_largest_eigenvalue(image, sigma=1)
+    max_eigenvalue = compute_largest_eigenvalue(image, sigma=1, pad_width=25)
     cc_mask = apply_h_watershed(max_eigenvalue, min_distance=5) * camm
     metrics = calculate_quantitative_metrics(image, cc_mask)
 

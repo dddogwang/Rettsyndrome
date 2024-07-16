@@ -1,7 +1,7 @@
 print("🥁 PYTHON SCRIPT START", flush=True)
 # 0. Import Libraries and Mount Drive
 print("🚀 0. Import Libraries and Mount Drive", flush=True)
-import cv2,os,argparse
+import cv2,os,argparse,sys
 from skimage import io
 from PIL import Image
 import numpy as np
@@ -69,45 +69,16 @@ dataset = cell_dataset(X, y)
 print("done", flush=True)
 print("##########################################################", flush=True)
 
-print("🚀 2. Develop model", flush=True)
+print("🚀 2. Develop model", flush=True)   
+sys.path.append('/home/acd13264yb/DDDog/Rettsyndrome/Classification')
 if model_type=="Resnet10_noavg":
-    class ResNet(nn.Module):
-        def __init__(self):
-            super(ResNet,self).__init__()
-            self.resnet = models.resnet18(weights=True)
-            self.resnet.layer3 = nn.Sequential()
-            self.resnet.layer4 = nn.Sequential()
-            self.resnet.avgpool = nn.Sequential()
-            self.resnet.fc = nn.Linear(128*63*63, 2)
-            self.resnet.load_state_dict(torch.load(loadmodel))
-        def forward(self, x):
-            x = self.resnet(x)
-            # x = nn.Softmax(dim=1)(x)
-            return x
+    from models.Resnet10_noavg import MyModel
 elif model_type=="Resnet10":
-    class ResNet(nn.Module):
-        def __init__(self):
-            super(ResNet,self).__init__()
-            self.resnet = models.resnet18(weights=True)
-            self.resnet.layer3 = nn.Sequential()
-            self.resnet.layer4 = nn.Sequential()
-            self.resnet.fc = nn.Linear(128, 2)
-            self.resnet.load_state_dict(torch.load(loadmodel))
-        def forward(self, x):
-            x = self.resnet(x)
-            # x = nn.Softmax(dim=1)(x)
-            return x
+    from models.Resnet10 import MyModel
 elif model_type=="Resnet18":
-    class ResNet(nn.Module):
-        def __init__(self):
-            super(ResNet,self).__init__()
-            self.resnet = models.resnet18(weights=True)
-            self.resnet.fc = nn.Linear(512, 2)
-            self.resnet.load_state_dict(torch.load(loadmodel))
-        def forward(self, x):
-            x = self.resnet(x)
-            # x = nn.Softmax(dim=1)(x)
-            return x     
+    from models.Resnet18 import MyModel
+elif model_type=="HRUnet":
+    from models.HRUnet import MyModel
 print("done", flush=True)
 print("##########################################################", flush=True)
 
@@ -168,6 +139,7 @@ for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(len(dataset))
     loadmodel = f"{save_path}/{rett_type}_{stain_type}_{model_type}_Fold{str(fold)}.pkl"
     print("load model", flush=True)
     model = ResNet().to(device)
+    model.load_state_dict(torch.load(loadmodel))
     ngpu = 1
     if (device.type == 'cuda') and (ngpu > 1):
         model = nn.DataParallel(model, list(range(ngpu)))

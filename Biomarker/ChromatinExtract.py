@@ -33,7 +33,7 @@ for i in range(len(data)):
     
     image = data[i, :, :, 0]
 
-    max_eigenvalue = compute_largest_eigenvalue(image, sigma=1)
+    max_eigenvalue = compute_largest_eigenvalue(image, sigma=1, pad_width=10)
     cc_mask = apply_h_watershed(max_eigenvalue, min_distance=5)
     metrics = calculate_quantitative_metrics(image, cc_mask)
 
@@ -57,4 +57,4 @@ total_results[image_path] = df
 
 # 保存DataFrame到文件
 df.to_csv(f"{save_path}/{image_path}.csv", index=False)
-print(f"🔥 SAVE to{save_path}/{image_path}.csv", flush=True)
+print(f"🔥 SAVE to {save_path}/{image_path}.csv", flush=True)

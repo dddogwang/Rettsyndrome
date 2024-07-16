@@ -301,10 +301,10 @@ def filter_contours_by_proximity(contours, nuclear_contours, proximity=5):
 
     return new_contours
 
-def compute_largest_eigenvalue(image, sigma=1):
+def compute_largest_eigenvalue(image, sigma=1, pad_width=10):
     nuclear = (image!=0).astype(np.uint8)
-    nuclear_scaled = transform.rescale(nuclear, 48/50)
-    nuclear_padded = np.pad(nuclear_scaled, pad_width=10, mode='constant', constant_values=0)
+    nuclear_scaled = transform.rescale(nuclear, (500-pad_width*2)/500)
+    nuclear_padded = np.pad(nuclear_scaled, pad_width=pad_width, mode='constant', constant_values=0)
 
     # 计算结构张量
     result = feature.structure_tensor(image, sigma=sigma, order='rc')
@@ -315,7 +315,7 @@ def compute_largest_eigenvalue(image, sigma=1):
 
 # 使用distance_transform_edt
 def apply_h_watershed(image, min_distance=5):
-    mask = image > threshold_otsu(image)
+    mask = image > threshold_otsu(image[image > 0])
     # 计算距离变换
     distance = distance_transform_edt(mask)
     # 在距离图中找到峰值
