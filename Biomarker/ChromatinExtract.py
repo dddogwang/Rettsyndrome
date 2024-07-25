@@ -33,8 +33,8 @@ for i in range(len(data)):
     
     image = data[i, :, :, 0]
 
-    max_eigenvalue = compute_largest_eigenvalue(image, sigma=1, pad_width=10)
-    cc_mask = apply_h_watershed(max_eigenvalue, min_distance=5)
+    # max_eigenvalue = compute_largest_eigenvalue(image, sigma=1, pad_width=10)
+    cc_mask = thre_h_watershed(image, min_distance=5, max_area=300)
     metrics = calculate_quantitative_metrics(image, cc_mask)
 
     # 将metrics字典转换为一行

@@ -276,8 +276,8 @@ def validata_boxplot(data_all, target, rett_type, feature):
     plt.show()
     print(f"Saved BOX plot to {savepath}")
 
-from skimage import feature, transform
-from skimage.filters import threshold_otsu
+from skimage import io, feature, filters, transform, measure
+from scipy import ndimage as ndi
 from scipy.ndimage import distance_transform_edt
 from skimage.segmentation import watershed
 
@@ -331,6 +331,47 @@ def apply_h_watershed(image, min_distance=5):
     # 执行分水岭分割
     labels_ws = watershed(-distance, markers, mask=mask)
     return labels_ws
+
+def thre_h_watershed(image, ratio=1, min_distance=5, classes=4, max_area=None):
+    
+#     # Otsu 阈值化
+#     thre = threshold_otsu(image[image>0])
+#     binary_image = image > thre * ratio
+
+    # 使用多级 Otsu 阈值化
+    thresholds = filters.threshold_multiotsu(image[image > 0], classes=classes)
+    thre = thresholds[-1]
+    binary_image = image > thre * ratio
+    
+    # Compute the distance transform
+    distance = ndi.distance_transform_edt(binary_image)
+
+    # Find local maxima
+    local_maxi = feature.peak_local_max(distance, min_distance=min_distance, labels=binary_image)
+
+    # Marker labeling
+    if len(local_maxi)<=255:
+        markers = np.zeros_like(image, dtype=np.uint8)
+    else:
+        markers = np.zeros_like(image, dtype=np.int32)
+    for i, (row, col) in enumerate(local_maxi):
+        markers[row, col] = i + 1
+        
+    # Apply watershed
+    cc_mask = watershed(-distance, markers, mask=binary_image)
+    
+    # remove area >= max_area
+    if max_area!=None:
+        regions = measure.regionprops(cc_mask)
+        # Create a mask for regions with area <= max_area
+        mask = np.zeros_like(cc_mask, dtype=bool)
+        for region in regions:
+            if region.area <= max_area:
+                mask[tuple(region.coords.T)] = True
+        cc_mask = cc_mask * mask
+    
+    return cc_mask
+
 
 
 from skimage import measure
