@@ -23,9 +23,9 @@ def loadcsv(target, stain_type, rett_type):
         loadpath_CTRL = f"tables/{target}/features_HPS9999_CTRL_{stain_type}.csv"
     elif target=="features_ScoreCAM":
         loadpath_RETT = f"tables/{target}/features_{rett_type}_RETT_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
-        loadpath_CTRL = f"tables/{target}/features_{rett_type}_Ctrl_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
+        loadpath_CTRL = f"tables/{target}/features_{rett_type}_CTRL_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
     else:
-        print(f"Load Failed, can not find {loadpath}")
+        print(f"Load Failed, can not find {target}")
     # 定义你想要读取的列的索引，注意 Python 索引从 0 开始
     columns_to_use = [10] + list(range(12, 19)) + list(range(20, 22)) + list(range(36, 99))
     # 读取 CSV 文件时仅加载指定的列
@@ -54,9 +54,9 @@ def loadcsv_Standard(target, stain_type, rett_type):
         loadpath_CTRL = f"tables/{target}/features_HPS9999_CTRL_{stain_type}.csv"
     elif target=="features_ScoreCAM":
         loadpath_RETT = f"tables/{target}/features_{rett_type}_RETT_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
-        loadpath_CTRL = f"tables/{target}/features_{rett_type}_Ctrl_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
+        loadpath_CTRL = f"tables/{target}/features_{rett_type}_CTRL_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
     else:
-        print(f"Load Failed, can not find {loadpath}")
+        print(f"Load Failed, can not find {target}")
         
     # 定义你想要读取的列的索引，注意 Python 索引从 0 开始
     columns_to_use = [10] + list(range(12, 19)) + list(range(20, 22)) + list(range(36, 99))
@@ -108,7 +108,7 @@ def correlation_matrix(df, titles, savename):
 
 
 
-def validate_pca(df_combined, df_RETT, df_CTRL, loadpath, savename):
+def validate_pca(df_combined, df_RETT, df_CTRL, target, savename):
     print("📊 PCA")
     # 提取特征数据
     features = df_combined.drop('State', axis=1)
@@ -130,7 +130,7 @@ def validate_pca(df_combined, df_RETT, df_CTRL, loadpath, savename):
     plt.figure(figsize=(16, 12))
     sns.heatmap(loading_df, annot=True, cmap='coolwarm')
     plt.title('PCA Loading Matrix')
-    plt.savefig(f'tables/{target}/{savename}_PCA_Matrix.png', dpi=300)
+#     plt.savefig(f'tables/{target}/{savename}_PCA_Matrix.png', dpi=300)
     plt.show()
 
     # 重置索引以确保对齐
@@ -140,7 +140,7 @@ def validate_pca(df_combined, df_RETT, df_CTRL, loadpath, savename):
     # 使用 Seaborn 绘制 PCA 结果图
     sns.scatterplot(data=finalDf, x='principal component 1', y='principal component 2', hue='State')
     plt.title('PCA of Dataset by State')
-    plt.savefig(f'tables/{target}/{savename}_PCA.png', dpi=300)
+#     plt.savefig(f'tables/{target}/{savename}_PCA.png', dpi=300)
     plt.show()
     
     
@@ -256,7 +256,11 @@ def validata_boxplot(data_all, target, rett_type, feature):
     for stain in unique_stains:
         group_ctrl = data_all[(data_all['State'] == 'CTRL') & (data_all['Stain_Type'] == stain)][feature]
         group_rett = data_all[(data_all['State'] == 'RETT') & (data_all['Stain_Type'] == stain)][feature]
-        _, p_val = ttest_ind(group_ctrl, group_rett)
+        t_val, p_val = ttest_ind(group_ctrl, group_rett, equal_var=False)  # 可以假设不等方差
+        # 单边检验：假设组1（RETT）的均值大于组2（CTRL）
+        p_val = p_val / 2
+        # 如果 t 值为负，则取 1 - (p 值 / 2)
+        p_val = np.where(t_val < 0, 1 - p_val, p_val)
         p_values.append(p_val)
     for i in range(len(unique_stains)):
         print(f"p-value {unique_stains[i]}: {p_values[i]}")
@@ -315,7 +319,7 @@ def compute_largest_eigenvalue(image, sigma=1, pad_width=10):
 
 # 使用distance_transform_edt
 def apply_h_watershed(image, min_distance=5):
-    mask = image > threshold_otsu(image[image > 0])
+    mask = image > filters.threshold_otsu(image[image > 0])
     # 计算距离变换
     distance = distance_transform_edt(mask)
     # 在距离图中找到峰值
