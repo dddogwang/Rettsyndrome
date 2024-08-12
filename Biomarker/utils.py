@@ -376,11 +376,83 @@ def thre_h_watershed(image, ratio=1, min_distance=5, classes=4, max_area=None):
     
     return cc_mask
 
+from skimage.measure import find_contours
+
+def plot_contours(image, cc_mask):
+    plt.imshow(image, cmap='gray')
+    for i in range(cc_mask.max()):
+        cc_contours = find_contours(cc_mask==i, level=0.5)
+        for contour in cc_contours:
+            plt.plot(contour[:, 1], contour[:, 0], linewidth=2)
+            
+def show_mask_and_metrics(ctrl_type, rett_type, chip_type, num, lr=False, home_path="../Classification"):
+    
+    if ctrl_type=="RETT":
+        image_path = f"{ctrl_type}_{rett_type}_{chip_type}"
+    elif ctrl_type=="CTRL":
+        image_path = f"{ctrl_type}_{chip_type}"
+    
+    if not lr:
+        image = np.load(f"{home_path}/Datasets/{image_path}.npy", allow_pickle=True)[num,:,:,0]
+    elif lr:
+        image = np.load(f"{home_path}/Datasets_LR/{image_path}.npy", allow_pickle=True)[num,:,:,0]
+    
+    cc_mask = thre_h_watershed(image, min_distance=5, max_area=1000)
+    
+    # Metrics particle (Heterochromatin)
+    metrics = calculate_quantitative_metrics(image, cc_mask)
+    print(f"💠 {ctrl_type}-{rett_type}-{chip_type} Calculate_quantitative_metrics:")
+    for key, value in metrics.items():
+        print(f"{key}: {value}")
+        
+    # plot mask
+    plt.figure(figsize=(20,20))
+    plt.subplot(1,2,1)
+    plt.imshow(cc_mask, cmap='gray')
+    
+    # plot contours
+    plt.subplot(1,2,2)
+    plt.imshow(image, cmap='gray')
+    for i in range(cc_mask.max()):
+        cc_contours = find_contours(cc_mask==i, level=0.5)
+        for contour in cc_contours:
+            plt.plot(contour[:, 1], contour[:, 0], linewidth=2)
+    plt.show()
+    
+    return cc_mask
+
+def Axis_ratio(image):
+    # 计算区域属性
+    regions = measure.regionprops(image)
+
+    # 计算长轴和短轴的比
+    if len(regions)==1: 
+        region = regions[0]
+        if region.area >= 1:  # 过滤掉面积过小的区域
+            if region.minor_axis_length > 0:  # 避免除以零
+                axis_ratio = region.major_axis_length / region.minor_axis_length
+                return axis_ratio
+            else: return None
+#                 print("minor_axis_length is 0, return None")
+                
+    else: return None
+#         print("Find more than one particle in mask, return None")
+
+def Axis_ratio_nucleus(cc_mask):
+    all_cc_mask = [cc_mask==i for i in range(1, cc_mask.max())]
+    all_cc_mask = np.array(all_cc_mask).astype(int)
+
+    all_Axis_ratio=[]
+    for mask in all_cc_mask:
+        ratio = Axis_ratio(mask)
+        if ratio!=None: all_Axis_ratio.append(ratio)
+
+    return np.mean(all_Axis_ratio)
 
 
 from skimage import measure
 
-def calculate_quantitative_metrics(nucleus_image, cc_mask):
+def calculate_quantitative_metrics(nucleus_image, cc_labels):
     """
     计算细胞核图像的量化指标。
     
@@ -394,7 +466,6 @@ def calculate_quantitative_metrics(nucleus_image, cc_mask):
     metrics = {}
     
     # 计算可见染色中心的数量
-    cc_labels = measure.label(cc_mask, connectivity=2)
     num_cc = np.max(cc_labels)
     metrics['chromatin_num'] = num_cc
     
@@ -404,7 +475,6 @@ def calculate_quantitative_metrics(nucleus_image, cc_mask):
     
     # 计算平均chromatin面积 (CA)
     cc_areas = [np.sum(cc_labels == i) for i in range(1, num_cc + 1)]
-#     metrics['relative_cc_areas'] = relative_cc_areas
     metrics['chromatin_area'] = np.mean(cc_areas)
 
     # 计算相对(核)chromatin面积和 (RCA-S)
@@ -430,6 +500,9 @@ def calculate_quantitative_metrics(nucleus_image, cc_mask):
     # # 计算相对(核)chromatin比例 (RHF)
     # rhf = hf * rhi
     # metrics['relative_heterochromatin_fraction'] = rhf
+    
+    # Axis ratio
+    metrics['axis_ratio'] = Axis_ratio_nucleus(cc_labels)
     
     return metrics
  

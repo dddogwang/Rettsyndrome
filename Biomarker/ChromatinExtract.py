@@ -48,6 +48,7 @@ for i in range(len(data)):
         'chromatin_intensity': metrics['chromatin_intensity'],
         'RCI-S': metrics['RCI-S'],
         'RCI-M': metrics['RCI-M'],
+        'axis_ratio': metrics['axis_ratio']
     }
     results.append(result_row)
 
@@ -56,5 +57,5 @@ df = pd.DataFrame(results)
 total_results[image_path] = df
 
 # 保存DataFrame到文件
-df.to_csv(f"{save_path}/{image_path}.csv", index=False)
-print(f"🔥 SAVE to {save_path}/{image_path}.csv", flush=True)
+df.to_csv(f"{save_path}/{image_path}-300.csv", index=False)
+print(f"🔥 SAVE to {save_path}/{image_path}-300.csv", flush=True)
