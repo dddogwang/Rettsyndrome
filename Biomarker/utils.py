@@ -384,7 +384,15 @@ def plot_contours(image, cc_mask):
         cc_contours = find_contours(cc_mask==i, level=0.5)
         for contour in cc_contours:
             plt.plot(contour[:, 1], contour[:, 0], linewidth=2)
+
             
+def get_image_path(ctrl_type, chip_type, rett_type="HPS9999"):
+    if ctrl_type=="RETT":
+        image_path = f"{ctrl_type}_{rett_type}_{chip_type}"
+    elif ctrl_type=="CTRL":
+        image_path = f"{ctrl_type}_{chip_type}"
+    return image_path
+
 def show_mask_and_metrics(ctrl_type, rett_type, chip_type, num, lr=False, home_path="../Classification"):
     
     if ctrl_type=="RETT":
