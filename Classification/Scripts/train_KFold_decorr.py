@@ -38,7 +38,7 @@ if __name__ == "__main__":
     parser.add_argument("--image_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/Datasets")
     parser.add_argument("--save_path", type=str, default="/home/acd13264yb/DDDog/Rettsyndrome/Classification/results")
     parser.add_argument("--n_epochs", type=int, default=200)
-    parser.add_argument("--batch_size", type=int, default=8)
+    parser.add_argument("--batch_size", type=int, default=4)
     parser.add_argument("--learning_rate", type=float, default=0.0001)
     args = parser.parse_args()
 
@@ -70,20 +70,14 @@ print("done", flush=True)
 print("##########################################################", flush=True)
 
 print("🚀 2. Develop model", flush=True)
-sys.path.append('/home/acd13264yb/DDDog/Rettsyndrome/Classification')
-if model_type=="Resnet10_noavg":
-    from models.Resnet10_noavg import MyModel
-elif model_type=="Resnet10":
-    from models.Resnet10 import MyModel
-elif model_type=="Resnet18":
-    from models.Resnet18 import MyModel
-elif model_type=="HRUnet":
-    from models.HRUnet import MyModel
+sys.path.append('/home/acd13264yb/WorkSpace/Rettsyndrome/Classification')
+from models.Resnet10_ldr import MyModel
+from models.Resnet10_ldr import linear_dependency_regularization
 print("done", flush=True)
 print("##########################################################", flush=True)
 
 print("🚀 3. Define Training and Validation", flush=True)
-def train(model,device,dataloader_train,criterion,optimizer):
+def train(model,device,dataloader_train,criterion,optimizer,ldr_weight=0.1):
     losses_train = []
     n_train = 0
     acc_train = 0
@@ -94,14 +88,16 @@ def train(model,device,dataloader_train,criterion,optimizer):
         model.zero_grad()  # 勾配の初期化
         x = x.to(device)  # テンソルをGPUに移動
         y = y.to(device)
-        output = model(x)  # 順伝播
-        loss = criterion(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
+        feature, output = model(x)  # 順伝播
+        task_loss = criterion(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
+        ldr_loss = linear_dependency_regularization(feature)
+        loss = task_loss + ldr_weight*ldr_loss
         loss.backward()  # 誤差の逆伝播
         optimizer.step()  # パラメータの更新
         acc_train += (output.argmax(1) == y[:,1]).float().sum().item()
         losses_train.append(loss.tolist())
     return np.mean(losses_train), (acc_train/n_train)       
-def valid(model,device,dataloader_valid,criterion):
+def valid(model,device,dataloader_valid,criterion,ldr_weight=0.1):
     losses_valid = []
     n_val = 0
     acc_val = 0
@@ -110,8 +106,10 @@ def valid(model,device,dataloader_valid,criterion):
         n_val += y.size()[0]
         x = x.to(device)  # テンソルをGPUに移動
         y = y.to(device)
-        output = model(x)  # 順伝播
-        loss = criterion(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
+        feature, output = model(x)  # 順伝播
+        task_loss = criterion(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
+        ldr_loss = linear_dependency_regularization(feature)
+        loss = task_loss + ldr_weight*ldr_loss
         acc_val += (output.argmax(1) == y[:,1]).float().sum().item()
         losses_valid.append(loss.tolist())
     return np.mean(losses_valid), (acc_val/n_val)

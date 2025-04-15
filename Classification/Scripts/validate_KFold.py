@@ -104,7 +104,7 @@ def plot_and_save_roc_curve(y_true, y_scores, fold):
     return auc_score
 
 # 你的valid函数现在需要收集预测的分数和实际标签，以计算AUC
-def valid(model, device, dataloader_valid, loss_function):
+def valid(model, device, dataloader_valid, criterion):
     model.eval()
     y_true = []
     y_scores = []
@@ -118,7 +118,7 @@ def valid(model, device, dataloader_valid, loss_function):
             output = model(x)
         y_true.extend(y[:,1].tolist())  # 假设y的第二列是标签
         y_scores.extend(output[:,1].sigmoid().tolist())  # 假设模型的第二个输出是预测为正类的得分
-        loss = loss_function(output, y)
+        loss = criterion(output, y)
         acc_val += (output.argmax(1) == y[:,1]).float().sum().item()
         losses_valid.append(loss.item())
     auc_score = plot_and_save_roc_curve(y_true, y_scores, fold)  # 调用ROC绘图函数
@@ -147,8 +147,8 @@ for fold, (train_idx, val_idx) in enumerate(splits.split(np.arange(len(dataset))
 
     weights = torch.tensor([(len(X_Ctrl)+len(X_Rett))/len(X_Ctrl), 
                             (len(X_Ctrl)+len(X_Rett))/len(X_Rett)]).cuda()
-    loss_function = nn.BCEWithLogitsLoss(pos_weight=weights)
-    loss_valid, acc_valid, auc_valid = valid(model, device, dataloader_valid, loss_function)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=weights)
+    loss_valid, acc_valid, auc_valid = valid(model, device, dataloader_valid, criterion)
     print(f'Fold {fold+1}, EPOCH: [Valid [Loss: {loss_valid:.3f}, Accuracy: {acc_valid:.3f}, AUC: {auc_valid:.3f}]')
     history['loss_valid'].append(loss_valid)
     history['acc_valid'].append(acc_valid)

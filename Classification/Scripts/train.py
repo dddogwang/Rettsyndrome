@@ -133,7 +133,7 @@ print("done", flush=True)
 print("##########################################################", flush=True)
 
 print("4. Define Training and Validation", flush=True)
-def train(model,device,dataloader_train,loss_function,optimizer):
+def train(model,device,dataloader_train,criterion,optimizer):
     losses_train = []
     n_train = 0
     acc_train = 0
@@ -145,13 +145,13 @@ def train(model,device,dataloader_train,loss_function,optimizer):
         x = x.to(device)  # テンソルをGPUに移動
         y = y.to(device)
         output = model.forward(x)  # 順伝播
-        loss = loss_function(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
+        loss = criterion(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
         loss.backward()  # 誤差の逆伝播
         optimizer.step()  # パラメータの更新
         acc_train += (output.argmax(1) == y[:,1]).float().sum().item()
         losses_train.append(loss.tolist())
     return np.mean(losses_train), (acc_train/n_train)       
-def valid(model,device,dataloader_valid,loss_function):
+def valid(model,device,dataloader_valid,criterion):
     losses_valid = []
     n_val = 0
     acc_val = 0
@@ -161,7 +161,7 @@ def valid(model,device,dataloader_valid,loss_function):
         x = x.to(device)  # テンソルをGPUに移動
         y = y.to(device)
         output = model.forward(x)  # 順伝播
-        loss = loss_function(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
+        loss = criterion(output, y)  # 誤差(クロスエントロピー誤差関数)の計算
         acc_val += (output.argmax(1) == y[:,1]).float().sum().item()
         losses_valid.append(loss.tolist())
     return np.mean(losses_valid), (acc_val/n_val)
@@ -171,13 +171,13 @@ print("##########################################################", flush=True)
 print("5. Train by KFold of Cross Validation", flush=True)
 n_epochs = 300
 model.avgpool = nn.AdaptiveAvgPool2d(1)
-loss_function = nn.BCELoss()
+criterion = nn.BCELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.00001)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 history = {'loss_train': [], 'loss_valid': [],'acc_train':[],'acc_valid':[]}
 for epoch in range(n_epochs):
-    loss_train, acc_train = train(model,device,dataloader_train,loss_function,optimizer)
-    loss_valid, acc_valid = valid(model,device,dataloader_valid,loss_function)
+    loss_train, acc_train = train(model,device,dataloader_train,criterion,optimizer)
+    loss_valid, acc_valid = valid(model,device,dataloader_valid,criterion)
     scheduler.step()
     print('EPOCH: {}, Train [Loss: {:.3f}, Accuracy: {:.3f}], Valid [Loss: {:.3f}, Accuracy: {:.3f}]'
           .format(epoch, loss_train, acc_train, loss_valid, acc_valid), flush=True)   
