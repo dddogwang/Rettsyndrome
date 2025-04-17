@@ -1,9 +1,0 @@
-Datasets/
-results/
-results_LR/
-results_cam/
-Models/
-Jobs/
-*.pkl
-*.tar.gz
-*.npy
