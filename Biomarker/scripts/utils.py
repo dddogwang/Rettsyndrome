@@ -16,23 +16,13 @@ def remove_outliers(df, multiplier=1.5):
     IQR = Q3 - Q1
     return df[~((df < (Q1 - multiplier * IQR)) | (df > (Q3 + multiplier * IQR))).any(axis=1)]
 
+def loadcsv(loadpath_RETT, loadpath_CTRL):
 
-def loadcsv(target, stain_type, rett_type):
-    if target=="features_image":
-        loadpath_RETT = f"tables/{target}/features_{rett_type}_RETT_{stain_type}.csv"
-        loadpath_CTRL = f"tables/{target}/features_HPS9999_CTRL_{stain_type}.csv"
-    elif target=="features_ScoreCAM":
-        loadpath_RETT = f"tables/{target}/features_{rett_type}_RETT_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
-        loadpath_CTRL = f"tables/{target}/features_{rett_type}_CTRL_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
-    else:
-        print(f"Load Failed, can not find {target}")
-    # 定义你想要读取的列的索引，注意 Python 索引从 0 开始
-    columns_to_use = [10] + list(range(12, 19)) + list(range(20, 22)) + list(range(36, 99))
-    # 读取 CSV 文件时仅加载指定的列
-    df_RETT = pd.read_csv(loadpath_RETT, usecols=columns_to_use).dropna()  # 删除包含 NaN 的样本
-    df_CTRL = pd.read_csv(loadpath_CTRL, usecols=columns_to_use).dropna()  # 删除包含 NaN 的样本
-    print(f"🦠 LOAD {loadpath_RETT} {df_RETT.shape}")
-    print(f"🧫 LOAD {loadpath_CTRL} {df_CTRL.shape}")
+    # 读取 CSV 文件
+    df_RETT = pd.read_csv(loadpath_RETT).dropna()  # 删除包含 NaN 的样本
+    df_CTRL = pd.read_csv(loadpath_CTRL).dropna()  # 删除包含 NaN 的样本
+    print(f"LOAD {loadpath_RETT} {df_RETT.shape}")
+    print(f"LOAD {loadpath_CTRL} {df_CTRL.shape}")
     
 #     # 删除离群点
 #     df_RETT_filtered = remove_outliers(df_RETT_scaled, multiplier=2)
@@ -48,23 +38,13 @@ def loadcsv(target, stain_type, rett_type):
     
     return df_combined, df_RETT, df_CTRL
 
-def loadcsv_Standard(target, stain_type, rett_type):
-    if target=="features_image":
-        loadpath_RETT = f"tables/{target}/features_{rett_type}_RETT_{stain_type}.csv"
-        loadpath_CTRL = f"tables/{target}/features_HPS9999_CTRL_{stain_type}.csv"
-    elif target=="features_ScoreCAM":
-        loadpath_RETT = f"tables/{target}/features_{rett_type}_RETT_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
-        loadpath_CTRL = f"tables/{target}/features_{rett_type}_CTRL_{stain_type}_Resnet10_noavg_ScoreCAM.csv"
-    else:
-        print(f"Load Failed, can not find {target}")
-        
-    # 定义你想要读取的列的索引，注意 Python 索引从 0 开始
-    columns_to_use = [10] + list(range(12, 19)) + list(range(20, 22)) + list(range(36, 99))
-    # 读取 CSV 文件时仅加载指定的列
-    df_RETT = pd.read_csv(loadpath_RETT, usecols=columns_to_use).dropna()  # 删除包含 NaN 的样本
-    df_CTRL = pd.read_csv(loadpath_CTRL, usecols=columns_to_use).dropna()  # 删除包含 NaN 的样本
-    print(f"🦠 LOAD {loadpath_RETT} {df_RETT.shape}")
-    print(f"🧫 LOAD {loadpath_CTRL} {df_CTRL.shape}")
+def loadcsv_Standard(loadpath_RETT, loadpath_CTRL):
+
+    # 读取 CSV 文件
+    df_RETT = pd.read_csv(loadpath_RETT).dropna()  # 删除包含 NaN 的样本
+    df_CTRL = pd.read_csv(loadpath_CTRL).dropna()  # 删除包含 NaN 的样本
+    print(f"LOAD {loadpath_RETT} {df_RETT.shape}")
+    print(f"LOAD {loadpath_CTRL} {df_CTRL.shape}")
     
     # 标准化数据
     scaler = StandardScaler()
@@ -80,10 +60,6 @@ def loadcsv_Standard(target, stain_type, rett_type):
     df_RETT['State'] = 'RETT'
     df_CTRL['State'] = 'CTRL'
     
-    # 合并数据
-    df_combined = pd.concat([df_CTRL, df_RETT])
-
-
     # 合并数据
     df_combined = pd.concat([df_CTRL, df_RETT])
     
@@ -280,111 +256,6 @@ def validata_boxplot(data_all, target, rett_type, feature):
     plt.show()
     print(f"Saved BOX plot to {savepath}")
 
-from skimage import io, feature, filters, transform, measure
-from scipy import ndimage as ndi
-from scipy.ndimage import distance_transform_edt
-from skimage.segmentation import watershed
-
-def is_close(point, other_points, threshold=5):
-    """检查是否有任何点在阈值范围内"""
-    for other in other_points:
-        if np.linalg.norm(np.array(point) - np.array(other)) <= threshold:
-            return True
-    return False
-
-def filter_contours_by_proximity(contours, nuclear_contours, proximity=5):
-    """过滤掉靠近核心轮廓的轮廓"""
-    new_contours = []
-    # 展平 nuclear_contours 中的所有点
-    all_nuclear_points = [point for contour in nuclear_contours for point in contour]
-
-    for contour in contours:
-        # 检查轮廓中的任何点是否靠近核心轮廓的点
-        if not any(is_close(point, all_nuclear_points, proximity) for point in contour):
-            new_contours.append(contour)
-
-    return new_contours
-
-def compute_largest_eigenvalue(image, sigma=1, pad_width=10):
-    nuclear = (image!=0).astype(np.uint8)
-    nuclear_scaled = transform.rescale(nuclear, (500-pad_width*2)/500)
-    nuclear_padded = np.pad(nuclear_scaled, pad_width=pad_width, mode='constant', constant_values=0)
-
-    # 计算结构张量
-    result = feature.structure_tensor(image, sigma=sigma, order='rc')
-    # 从结构张量中获取特征值
-    eigenvalues = feature.structure_tensor_eigenvalues(result)
-    # 返回每个点的最大特征值
-    return np.max(eigenvalues, axis=0)*nuclear_padded
-
-# 使用distance_transform_edt
-def apply_h_watershed(image, min_distance=5):
-    mask = image > filters.threshold_otsu(image[image > 0])
-    # 计算距离变换
-    distance = distance_transform_edt(mask)
-    # 在距离图中找到峰值
-    local_maxi = feature.peak_local_max(distance, min_distance=min_distance, labels=mask)
-    # 将峰值的坐标转换为标记矩阵
-    if len(local_maxi)<=255:
-        markers = np.zeros_like(image, dtype=np.uint8)
-    else:
-#         print("len(local_maxi)>255")
-        markers = np.zeros_like(image, dtype=np.int32)
-    for i, (row, col) in enumerate(local_maxi):
-        markers[row, col] = i + 1
-    # 执行分水岭分割
-    labels_ws = watershed(-distance, markers, mask=mask)
-    return labels_ws
-
-def thre_h_watershed(image, ratio=1, min_distance=5, classes=4, max_area=None):
-    
-#     # Otsu 阈值化
-#     thre = threshold_otsu(image[image>0])
-#     binary_image = image > thre * ratio
-
-    # 使用多级 Otsu 阈值化
-    thresholds = filters.threshold_multiotsu(image[image > 0], classes=classes)
-    thre = thresholds[-1]
-    binary_image = image > thre * ratio
-    
-    # Compute the distance transform
-    distance = ndi.distance_transform_edt(binary_image)
-
-    # Find local maxima
-    local_maxi = feature.peak_local_max(distance, min_distance=min_distance, labels=binary_image)
-
-    # Marker labeling
-    if len(local_maxi)<=255:
-        markers = np.zeros_like(image, dtype=np.uint8)
-    else:
-        markers = np.zeros_like(image, dtype=np.int32)
-    for i, (row, col) in enumerate(local_maxi):
-        markers[row, col] = i + 1
-        
-    # Apply watershed
-    cc_mask = watershed(-distance, markers, mask=binary_image)
-    
-    # remove area >= max_area
-    if max_area!=None:
-        regions = measure.regionprops(cc_mask)
-        # Create a mask for regions with area <= max_area
-        mask = np.zeros_like(cc_mask, dtype=bool)
-        for region in regions:
-            if region.area <= max_area:
-                mask[tuple(region.coords.T)] = True
-        cc_mask = cc_mask * mask
-    
-    return cc_mask
-
-from skimage.measure import find_contours
-
-def plot_contours(image, cc_mask):
-    plt.imshow(image, cmap='gray')
-    for i in range(cc_mask.max()):
-        cc_contours = find_contours(cc_mask==i, level=0.5)
-        for contour in cc_contours:
-            plt.plot(contour[:, 1], contour[:, 0], linewidth=2)
-
             
 def get_image_path(ctrl_type, chip_type, rett_type="HPS9999"):
     if ctrl_type=="RETT":
@@ -392,125 +263,3 @@ def get_image_path(ctrl_type, chip_type, rett_type="HPS9999"):
     elif ctrl_type=="CTRL":
         image_path = f"{ctrl_type}_{chip_type}"
     return image_path
-
-def show_mask_and_metrics(ctrl_type, rett_type, chip_type, num, lr=False, home_path="../Classification"):
-    
-    if ctrl_type=="RETT":
-        image_path = f"{ctrl_type}_{rett_type}_{chip_type}"
-    elif ctrl_type=="CTRL":
-        image_path = f"{ctrl_type}_{chip_type}"
-    
-    if not lr:
-        image = np.load(f"{home_path}/Datasets/{image_path}.npy", allow_pickle=True)[num,:,:,0]
-    elif lr:
-        image = np.load(f"{home_path}/Datasets_LR/{image_path}.npy", allow_pickle=True)[num,:,:,0]
-    
-    cc_mask = thre_h_watershed(image, min_distance=5, max_area=1000)
-    
-    # Metrics particle (Heterochromatin)
-    metrics = calculate_quantitative_metrics(image, cc_mask)
-    print(f"💠 {ctrl_type}-{rett_type}-{chip_type} Calculate_quantitative_metrics:")
-    for key, value in metrics.items():
-        print(f"{key}: {value}")
-        
-    # plot mask
-    plt.figure(figsize=(20,20))
-    plt.subplot(1,2,1)
-    plt.imshow(cc_mask, cmap='gray')
-    
-    # plot contours
-    plt.subplot(1,2,2)
-    plt.imshow(image, cmap='gray')
-    for i in range(cc_mask.max()):
-        cc_contours = find_contours(cc_mask==i, level=0.5)
-        for contour in cc_contours:
-            plt.plot(contour[:, 1], contour[:, 0], linewidth=2)
-    plt.show()
-    
-    return cc_mask
-
-def Axis_ratio(image):
-    # 计算区域属性
-    regions = measure.regionprops(image)
-
-    # 计算长轴和短轴的比
-    if len(regions)==1: 
-        region = regions[0]
-        if region.area >= 1:  # 过滤掉面积过小的区域
-            if region.minor_axis_length > 0:  # 避免除以零
-                axis_ratio = region.major_axis_length / region.minor_axis_length
-                return axis_ratio
-            else: return None
-#                 print("minor_axis_length is 0, return None")
-                
-    else: return None
-#         print("Find more than one particle in mask, return None")
-
-def Axis_ratio_nucleus(cc_mask):
-    all_cc_mask = [cc_mask==i for i in range(1, cc_mask.max())]
-    all_cc_mask = np.array(all_cc_mask).astype(int)
-
-    all_Axis_ratio=[]
-    for mask in all_cc_mask:
-        ratio = Axis_ratio(mask)
-        if ratio!=None: all_Axis_ratio.append(ratio)
-
-    return np.mean(all_Axis_ratio)
-
-
-from skimage import measure
-
-def calculate_quantitative_metrics(nucleus_image, cc_labels):
-    """
-    计算细胞核图像的量化指标。
-    
-    参数:
-    nucleus_image: numpy.ndarray, 细胞核图像，灰度图
-    cc_mask: numpy.ndarray, 染色中心的掩膜，二值图
-    
-    返回:
-    metrics: dict, 包含所有量化指标的字典
-    """
-    metrics = {}
-    
-    # 计算可见染色中心的数量
-    num_cc = np.max(cc_labels)
-    metrics['chromatin_num'] = num_cc
-    
-    # 计算细胞核面积
-    nuclear_area = np.sum(nucleus_image > 0)
-    metrics['nuclear_area'] = nuclear_area
-    
-    # 计算平均chromatin面积 (CA)
-    cc_areas = [np.sum(cc_labels == i) for i in range(1, num_cc + 1)]
-    metrics['chromatin_area'] = np.mean(cc_areas)
-
-    # 计算相对(核)chromatin面积和 (RCA-S)
-    metrics['RCA-S'] = np.sum(cc_areas)/nuclear_area
-
-    # 计算相对(核)chromatin面积平均 (RCA-M)
-    metrics['RCA-M'] = np.mean(cc_areas)/nuclear_area
-    
-    # 计算细胞核强度平均
-    nuclear_intensity = np.mean(nucleus_image[nucleus_image > 0])
-    metrics['nuclear_intensity'] = nuclear_intensity
-
-    # 计算平均chromatin强度平均 (CI-M)
-    cc_intensities = [np.mean(nucleus_image[cc_labels == i]) for i in range(1, num_cc + 1)]
-    metrics['chromatin_intensity'] = np.mean(cc_intensities)
-
-    # 计算相对(核)chromatin强度和 (RCI-S)
-    metrics['RCI-S'] = np.sum(cc_intensities)/nuclear_intensity
-
-    # 计算相对(核)chromatin强度平均 (RCI-M)
-    metrics['RCI-M'] = np.mean(cc_intensities)/nuclear_intensity
-    
-    # # 计算相对(核)chromatin比例 (RHF)
-    # rhf = hf * rhi
-    # metrics['relative_heterochromatin_fraction'] = rhf
-    
-    # Axis ratio
-    metrics['axis_ratio'] = Axis_ratio_nucleus(cc_labels)
-    
-    return metrics
- 
