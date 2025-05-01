@@ -16,13 +16,13 @@ def remove_outliers(df, multiplier=1.5):
     IQR = Q3 - Q1
     return df[~((df < (Q1 - multiplier * IQR)) | (df > (Q3 + multiplier * IQR))).any(axis=1)]
 
-def loadcsv(loadpath_RETT, loadpath_CTRL):
+def loadcsv(loadpath_RETT, loadpath_CTRL, rett="RETT"):
 
     # 读取 CSV 文件
     df_RETT = pd.read_csv(loadpath_RETT).dropna()  # 删除包含 NaN 的样本
     df_CTRL = pd.read_csv(loadpath_CTRL).dropna()  # 删除包含 NaN 的样本
-    print(f"LOAD {loadpath_RETT} {df_RETT.shape}")
-    print(f"LOAD {loadpath_CTRL} {df_CTRL.shape}")
+    # print(f"LOAD {rett} {df_RETT.shape}")
+    # print(f"LOAD CTRL {df_CTRL.shape}")
     
 #     # 删除离群点
 #     df_RETT_filtered = remove_outliers(df_RETT_scaled, multiplier=2)
@@ -30,7 +30,7 @@ def loadcsv(loadpath_RETT, loadpath_CTRL):
 #     print(f"remove outliers {df_RETT_filtered.shape}, {df_CTRL_filtered.shape}")
 
 #   添加状态标签
-    df_RETT['State'] = 'RETT'
+    df_RETT['State'] = rett
     df_CTRL['State'] = 'CTRL'
     
     # 合并数据
