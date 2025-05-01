@@ -27,7 +27,7 @@ total_results = {}
 results = []
 
 for i in range(len(data)):
-    if i % 400 == 0: print(f"Process {i}/{len(data)}", flush=True)
+    if i % 100 == 0: print(f"Process {i}/{len(data)}", flush=True)
     
     image = data[i, :, :, 0]
 
@@ -58,6 +58,6 @@ for i in range(len(data)):
 
 # 将所有结果转换为DataFrame
 df = pd.DataFrame(results)
-save_path = f"{save_path}/{data_name}_metrics_basic.csv"
+save_path = f"{save_path}/{data_name}_basic.csv"
 df.to_csv(save_path, index=False)
 print(f"🔥 SAVE to {save_path}", flush=True)

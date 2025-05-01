@@ -1,106 +1,104 @@
-from skimage import measure
-import numpy as np
 import cv2
+import numpy as np
 from scipy.spatial import distance
+from skimage import measure
+from skimage.measure import regionprops_table
 
-def safe_mean(x):
-    return np.nanmean(x) if len(x) > 0 else np.nan
 
-def compute_chromatin_number(cc_mask):
-    """
-    计算染色中心的数量。
-    """
-    return np.max(cc_mask)
+# -----------------------------------------------------------------------------#
+# 基础指标
+# -----------------------------------------------------------------------------#
+def chromatin_centroid(cc_mask: np.ndarray) -> np.ndarray:
+    """返回 Nx2 质心坐标 (row, col)，整数化便于索引。"""
+    centroids = np.array([prop.centroid for prop in measure.regionprops(cc_mask)])
+    return np.round(centroids).astype(int)
 
-def compute_chromatin_area(nucleus_image, cc_mask, num_cc):
-    """
-    计算染色中心的面积。
-    """
-    metrics_areas = {}
-    
-    # 计算细胞核面积
-    nuclear_area = np.sum(nucleus_image > 0)
-    metrics_areas['nuclear_area'] = nuclear_area
-    
-    # 计算平均chromatin面积 (CA)
-    cc_areas = [np.count_nonzero(cc_mask == i) for i in range(1, num_cc + 1)]
-    metrics_areas['chromatin_area'] = np.mean(cc_areas) if cc_areas else np.nan
 
-    # 计算相对(核)chromatin面积和 (RCA-S)
-    metrics_areas['RCA-S'] = np.sum(cc_areas) / nuclear_area if nuclear_area > 0 else np.nan
+def compute_chromatin_number(cc_mask: np.ndarray) -> int:
+    """染色中心数量（标签最大值，假设标签从 1 开始）。"""
+    return int(cc_mask.max())
 
-    # 计算相对(核)chromatin面积平均 (RCA-M)
-    metrics_areas['RCA-M'] = np.mean(cc_areas) / nuclear_area if cc_areas and nuclear_area > 0 else np.nan
 
-    return metrics_areas
+def compute_chromatin_area(
+    nucleus_image: np.ndarray, cc_mask: np.ndarray, num_cc: int
+) -> dict[str, float]:
+    """面积相关指标：核面积、平均颗粒面积、相对面积 (RCA-S/M)。"""
+    metrics = {}
 
-def compute_chromatin_intensity(nucleus_image, cc_mask, num_cc):
-    """
-    计算染色中心的强度。
-    """
-    metrics_intensity = {}
-    
-    # 计算细胞核强度
-    nuclear_intensity = np.mean(nucleus_image[nucleus_image > 0])
-    metrics_intensity['nuclear_intensity'] = nuclear_intensity
-    
-    # 计算平均chromatin强度 (CI)
-    cc_intensities = [np.mean(nucleus_image[cc_mask == i]) for i in range(1, num_cc + 1) if np.any(cc_mask == i)]
-    metrics_intensity['chromatin_intensity'] = np.mean(cc_intensities) if cc_intensities else np.nan
+    # 1. 核面积（非零像素计数）
+    nuclear_area = np.count_nonzero(nucleus_image)
+    metrics["nuclear_area"] = float(nuclear_area)
 
-    # 计算相对(核)chromatin强度和 (RCI-S)
-    metrics_intensity['RCI-S'] = np.sum(cc_intensities) / nuclear_intensity if nuclear_intensity > 0 else np.nan
+    # 2. 每颗粒面积列表
+    cc_areas = regionprops_table(cc_mask, properties=["area"])["area"]
+    metrics["chromatin_area"] = float(np.mean(cc_areas)) if cc_areas.size else np.nan
 
-    # 计算相对(核)chromatin强度平均 (RCI-M)
-    metrics_intensity['RCI-M'] = np.mean(cc_intensities) / nuclear_intensity if cc_intensities and nuclear_intensity > 0 else np.nan
+    # 3. 相对面积
+    with np.errstate(divide="ignore", invalid="ignore"):
+        metrics["RCA-S"] = float(np.sum(cc_areas) / nuclear_area)
+        metrics["RCA-M"] = float(np.mean(cc_areas) / nuclear_area)
 
-    return metrics_intensity
+    return metrics
 
-def compute_chromatin_shape(cc_mask):
-    """
-    计算染色中心的形状。
-    """
-    # 提取每个连通区域（排除背景0）
-    all_cc_mask = [cc_mask == i for i in range(1, cc_mask.max())]
-    all_cc_mask = np.array(all_cc_mask).astype(int)
 
-    all_Axis_ratio = []
+def compute_chromatin_intensity(
+    nucleus_image: np.ndarray, cc_mask: np.ndarray, num_cc: int
+) -> dict[str, float]:
+    """强度相关指标：核平均灰度、颗粒平均灰度、相对强度 (RCI-S/M)。"""
+    metrics = {}
 
-    for mask in all_cc_mask:
-        regions = measure.regionprops(mask)
-        if len(regions) == 1:
-            region = regions[0]
-            if region.area >= 1 and region.minor_axis_length > 0:
-                axis_ratio = region.major_axis_length / region.minor_axis_length
-                all_Axis_ratio.append(axis_ratio)
+    nuclear_pixels = nucleus_image[nucleus_image > 0]
+    nuclear_intensity = float(np.mean(nuclear_pixels)) if nuclear_pixels.size else np.nan
+    metrics["nuclear_intensity"] = nuclear_intensity
 
-    return np.mean(all_Axis_ratio) if all_Axis_ratio else np.nan
+    cc_intensities = regionprops_table(
+        cc_mask, intensity_image=nucleus_image, properties=["mean_intensity"]
+    )["mean_intensity"]
+    metrics["chromatin_intensity"] = (
+        float(np.mean(cc_intensities)) if cc_intensities.size else np.nan
+    )
 
-def chromation_centroid(cc_mask):
-    """
-    计算染色中心的质心。
-    """
-    cc_props = measure.regionprops(cc_mask)
-    centroids = np.array([prop.centroid for prop in cc_props])
-    centroids = np.round(centroids).astype(int)
-    return centroids
+    with np.errstate(divide="ignore", invalid="ignore"):
+        metrics["RCI-S"] = float(np.sum(cc_intensities) / nuclear_intensity)
+        metrics["RCI-M"] = float(np.mean(cc_intensities) / nuclear_intensity)
 
-def compute_chromation_distribution(image, centroids, num_parts=5, num_per_area=250):
-    _, thresh = cv2.threshold(image, 0, 1, cv2.THRESH_BINARY)
+    return metrics
+
+
+def compute_chromatin_shape(cc_mask: np.ndarray, num_cc: int) -> float:
+    """平均长/短轴比；若无合法颗粒返回 NaN。"""
+    axis_ratios = [
+        r.major_axis_length / r.minor_axis_length
+        for r in measure.regionprops(cc_mask)
+        if r.minor_axis_length > 0
+    ]
+    return float(np.mean(axis_ratios)) if axis_ratios else np.nan
+
+# -----------------------------------------------------------------------------#
+# 分布特征
+# -----------------------------------------------------------------------------#
+
+def compute_chromatin_distribution(nucleus_image: np.ndarray, centroids: np.ndarray,
+                                   num_parts: int = 5,
+                                   num_per_area: int = 250) -> np.ndarray:
+
+    _, thresh = cv2.threshold(nucleus_image, 0, 1, cv2.THRESH_BINARY)
     mask = thresh.copy()
     h, w = thresh.shape[:2]
     mask_gap = 255//num_parts
     
     for i in range(num_parts, 0, -1):
-        scale = i/5
+        scale = i/num_parts
         new_h, new_w = int(h * scale), int(w * scale)
         d_h, d_w = (h - new_h) // 2, (w - new_w) // 2
-        resized = cv2.resize(thresh, (new_w, new_h))
+        resized = cv2.resize(thresh, (new_w, new_h),
+                             interpolation=cv2.INTER_NEAREST)
         copy = np.zeros_like(thresh)
         copy[d_h:d_h + new_h, d_w:d_w + new_w] = resized*2
         copy[copy == 0] = 1
         mask *= copy
-        
+    mask[mask == 1] = mask_gap
+    
     part_area = np.zeros(num_parts)
     part_centroids_num = np.zeros(num_parts)
     part_centroids_num_per_area = np.zeros(num_parts)
@@ -111,112 +109,142 @@ def compute_chromation_distribution(image, centroids, num_parts=5, num_per_area=
 
     for i in range(len(centroids)):
         part_num = mask[centroids[i, 0], centroids[i, 1]]//mask_gap
-        part_centroids_num[part_num.astype(int)-1] += 1
+        layer_idx = int(part_num - 1)
+        if 0 <= layer_idx < num_parts: part_centroids_num[layer_idx] += 1          # 防止负索引回绕
 
     for i in range(num_parts):
-        part_centroids_num_per_area[i] = part_centroids_num[i]*num_per_area/part_area[i]
+        part_centroids_num_per_area[i] = (
+            part_centroids_num[i]*num_per_area/part_area[i]
+            if part_area[i] else 0.0
+        )
     
     return part_centroids_num_per_area
 
-def H3K27ac_centroids_ctcf_mindist(H3K27ac_centroids, CTCF_centroids):
-    # 计算每个H3K27ac粒子到最近的CTCF粒子的距离
-    nearest_distances = []
-    for h3_centroid in H3K27ac_centroids:
-        distances = distance.cdist([h3_centroid], CTCF_centroids, 'euclidean')
-        nearest_distance = np.min(distances)
-        nearest_distances.append(nearest_distance)
+
+# -----------------------------------------------------------------------------#
+# H3K27ac / CTCF 共定位
+# -----------------------------------------------------------------------------#
+# def src2tgt_mindist(src_centroids, tgt_centroids):
+#     # 计算每个H3K27ac粒子到最近的CTCF粒子的距离
+#     nearest_distances = []
+#     for src_centroid in src_centroids:
+#         distances = distance.cdist([src_centroid], tgt_centroids, 'euclidean')
+#         nearest_distance = np.min(distances)
+#         nearest_distances.append(nearest_distance)
     
-    return nearest_distances
+#     return nearest_distances
 
-def H3K27ac_cirlce_ctcf_radius(H3K27ac_centroids, CTCF_centroids, maxradii=50):
-    # 设置要计算的不同半径范围
-    radii = np.arange(0, maxradii, 1)  # 0到50像素，步长为5
+# def src2tgt_cirlce_radius(src_centroids: np.ndarray, tgt_centroids: np.ndarray, maxradii=50):
+#     # 设置要计算的不同半径范围
+#     radii = np.arange(0, maxradii, 1)  # 0到50像素，步长为5
 
-    # 计算每个H3K27ac粒子不同半径范围内的CTCF粒子数量
-    counts_per_radius = {radius: [] for radius in radii}
+#     # 计算每个src粒子不同半径范围内的tgt粒子数量
+#     counts_per_radius = {radius: [] for radius in radii}
 
-    for h3_centroid in H3K27ac_centroids:
-        distances = distance.cdist([h3_centroid], CTCF_centroids, 'euclidean')[0]
-        for radius in radii:
-            count_within_radius = np.sum(distances <= radius)
-            counts_per_radius[radius].append(count_within_radius)
+#     for src_centroid in src_centroids:
+#         distances = distance.cdist([src_centroid], tgt_centroids, 'euclidean')[0]
+#         for radius in radii:
+#             count_within_radius = np.sum(distances <= radius)
+#             counts_per_radius[radius].append(count_within_radius)
 
-    # 计算每个半径范围内的平均CTCF粒子数量
-        average_counts_per_radius = {
-        radius: np.mean(counts) if counts else np.nan
-        for radius, counts in counts_per_radius.items()
-    }
+#     # 计算每个半径范围内的平均tgt粒子数量
+#     average_counts_per_radius = {
+#         radius: np.mean(counts) if counts else np.nan
+#         for radius, counts in counts_per_radius.items()
+#     }
     
-    return average_counts_per_radius 
+#     return average_counts_per_radius 
 
+def src2tgt_mindist(src_centroids: np.ndarray,
+                    tgt_centroids: np.ndarray) -> list[float]:
+    """计算 src 粒子到 tgt 粒子最近距离 (N×M)"""
+    if len(src_centroids) == 0:
+        return []
+    if len(tgt_centroids) == 0:
+        return [np.nan] * len(src_centroids)
 
-def compute_chromatin_metrics(nucleus_image, cc_mask):
+    # 向量化计算距离矩阵 (N × M)
+    dists = distance.cdist(src_centroids, tgt_centroids, metric="euclidean")
+    return dists.min(axis=1).tolist()
+
+def src2tgt_circle_radius(src_centroids: np.ndarray,
+                          tgt_centroids: np.ndarray,
+                          maxradii: int = 500,
+                          step: int = 1) -> dict[int, float]:
     """
-    计算细胞核图像的量化指标。
-    
-    参数:
-    nucleus_image: numpy.ndarray, 细胞核图像，灰度图
-    cc_mask: numpy.ndarray, 染色中心的掩膜，二值图
-    
-    返回:
-    metrics: dict, 包含所有量化指标的字典
+    计算 src 粒子在不同半径范围内的 tgt 粒子数量 (NxM)
+    """
+    radii = np.arange(0, maxradii, step, dtype=int)
+
+    # 边界情况
+    if len(src_centroids) == 0:
+        return {r: np.nan for r in radii}
+    if len(tgt_centroids) == 0:
+        return {r: 0.0 for r in radii}
+
+    dists = distance.cdist(src_centroids, tgt_centroids, metric="euclidean")  # N×M
+
+    avg_counts = {}
+    for r in radii:
+        avg_counts[r] = float(np.mean((dists <= r).sum(axis=1)))
+    return avg_counts
+
+# -----------------------------------------------------------------------------#
+# 汇总封装
+# -----------------------------------------------------------------------------#
+def compute_chromatin_metrics(
+    nucleus_image: np.ndarray, cc_mask: np.ndarray
+) -> dict[str, float]:
+    """
+    单核图像的所有 chromatin 指标。
+    返回 keys:
+      chromatin_num, nuclear_area, chromatin_area, RCA-S, RCA-M,
+      nuclear_intensity, chromatin_intensity, RCI-S, RCI-M,
+      chromatin_shape, chromatin_distribution_part1-5
     """
     nucleus_image = nucleus_image.astype(np.float32)
     cc_mask = cc_mask.astype(np.uint16)
 
-    metrics = {}
-    
-    # 计算染色中心的数量
-    num_cc = compute_chromatin_number(cc_mask)
-    metrics['chromatin_num'] = num_cc
-    
-    # 计算细胞核面积和染色中心面积
-    metrics.update(compute_chromatin_area(nucleus_image, cc_mask, num_cc))
+    metrics: dict[str, float] = {}
 
-    # 计算细胞核强度和染色中心强度
+    # 数量
+    num_cc = compute_chromatin_number(cc_mask)
+    metrics["chromatin_num"] = num_cc
+
+    # 面积 & 强度
+    metrics.update(compute_chromatin_area(nucleus_image, cc_mask, num_cc))
     metrics.update(compute_chromatin_intensity(nucleus_image, cc_mask, num_cc))
-    
-    # 计算染色中心的形状
-    metrics['chromatin_shape'] = compute_chromatin_shape(cc_mask)
-    
-    # 计算染色中心的质心
-    centroids = chromation_centroid(cc_mask)
-    chromatin_distribution = compute_chromation_distribution(nucleus_image, centroids)
-    metrics['chromatin_distribution_part1'] = chromatin_distribution[0]
-    metrics['chromatin_distribution_part2'] = chromatin_distribution[1]
-    metrics['chromatin_distribution_part3'] = chromatin_distribution[2]
-    metrics['chromatin_distribution_part4'] = chromatin_distribution[3]
-    metrics['chromatin_distribution_part5'] = chromatin_distribution[4]
+
+    # 形态
+    metrics["chromatin_shape"] = compute_chromatin_shape(cc_mask, num_cc)
+
+    # 分布
+    centroids = chromatin_centroid(cc_mask)
+    distr = compute_chromatin_distribution(nucleus_image, centroids)
+    for i, v in enumerate(distr):
+        metrics[f"chromatin_distribution_part{5-i}"] = v
 
     return metrics
- 
-def compute_co_location_metrics(H3K27ac_mask, CTCF_mask):
+
+
+def compute_co_location_metrics(
+    H3K27ac_mask: np.ndarray, CTCF_mask: np.ndarray
+) -> dict[str, object]:
     """
-    计算H3K27ac和CTCF粒子之间的共定位指标。
-    
-    参数:
-    H3K27ac_mask: numpy.ndarray, H3K27ac粒子的掩膜
-    CTCF_mask: numpy.ndarray, CTCF粒子的掩膜
-    
-    返回:
-    metrics: dict, 包含所有共定位指标的字典
+    H3K27ac 与 CTCF 共定位指标：
+      - h3k27ac2ctcf_mindist  (list)
+      - h3k27ac2ctcf_radius  (dict[radius]->avg count)
+      - ctcf2h3k27ac_mindist
+      - ctcf2h3k27ac_radius
     """
+    H3_centroids = chromatin_centroid(H3K27ac_mask)
+    CTCF_centroids = chromatin_centroid(CTCF_mask)
 
-    H3K27ac_centroids = chromation_centroid(H3K27ac_mask)
-    CTCF_centroids = chromation_centroid(CTCF_mask)
+    metrics: dict[str, object] = {}
 
-    metrics = {}
-    
-    # 计算H3K27ac粒子到最近CTCF粒子的距离
-    metrics['h3k27ac2ctcf_mindist'] = H3K27ac_centroids_ctcf_mindist(H3K27ac_centroids, CTCF_centroids)
-    
-    # 计算H3K27ac粒子在不同半径范围内的CTCF粒子数量
-    metrics['h3k27ac2ctcf_radius'] = H3K27ac_cirlce_ctcf_radius(H3K27ac_centroids, CTCF_centroids)
+    metrics["h3k27ac2ctcf_mindist"] = src2tgt_mindist(H3_centroids, CTCF_centroids)
+    metrics["h3k27ac2ctcf_radius"] = src2tgt_circle_radius(H3_centroids, CTCF_centroids)
+    metrics["ctcf2h3k27ac_mindist"] = src2tgt_mindist(CTCF_centroids, H3_centroids)
+    metrics["ctcf2h3k27ac_radius"] = src2tgt_circle_radius(CTCF_centroids, H3_centroids)
 
-    # 计算CTCF粒子到最近H3K27ac粒子的距离
-    metrics['ctcf2h3k27ac_mindist'] = H3K27ac_centroids_ctcf_mindist(CTCF_centroids, H3K27ac_centroids)
-    
-    # 计算CTCF粒子在不同半径范围内的H3K27ac粒子数量
-    metrics['ctcf2h3k27ac_radius'] = H3K27ac_cirlce_ctcf_radius(CTCF_centroids, H3K27ac_centroids)
-    
     return metrics

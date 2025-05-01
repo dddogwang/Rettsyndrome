@@ -48,7 +48,7 @@ for num in range(len(H3K27ac_images)):
     metrics_co_localization["ctcf2h3k27ac_mindist"].append(metrics["ctcf2h3k27ac_mindist"])
     metrics_co_localization["ctcf2h3k27ac_radius"].append(metrics["ctcf2h3k27ac_radius"])
 
-save_path = f"{save_path}/{data_name}_metrics_co_localization.pkl"
+save_path = f"{save_path}/{data_name}_colocation.pkl"
 with open(save_path, 'wb') as f:
     pickle.dump(metrics_co_localization, f)
 print(f"🔥 SAVE to {save_path}", flush=True)
