@@ -124,37 +124,6 @@ def compute_chromatin_distribution(nucleus_image: np.ndarray, centroids: np.ndar
 # -----------------------------------------------------------------------------#
 # H3K27ac / CTCF 共定位
 # -----------------------------------------------------------------------------#
-# def src2tgt_mindist(src_centroids, tgt_centroids):
-#     # 计算每个H3K27ac粒子到最近的CTCF粒子的距离
-#     nearest_distances = []
-#     for src_centroid in src_centroids:
-#         distances = distance.cdist([src_centroid], tgt_centroids, 'euclidean')
-#         nearest_distance = np.min(distances)
-#         nearest_distances.append(nearest_distance)
-    
-#     return nearest_distances
-
-# def src2tgt_cirlce_radius(src_centroids: np.ndarray, tgt_centroids: np.ndarray, maxradii=50):
-#     # 设置要计算的不同半径范围
-#     radii = np.arange(0, maxradii, 1)  # 0到50像素，步长为5
-
-#     # 计算每个src粒子不同半径范围内的tgt粒子数量
-#     counts_per_radius = {radius: [] for radius in radii}
-
-#     for src_centroid in src_centroids:
-#         distances = distance.cdist([src_centroid], tgt_centroids, 'euclidean')[0]
-#         for radius in radii:
-#             count_within_radius = np.sum(distances <= radius)
-#             counts_per_radius[radius].append(count_within_radius)
-
-#     # 计算每个半径范围内的平均tgt粒子数量
-#     average_counts_per_radius = {
-#         radius: np.mean(counts) if counts else np.nan
-#         for radius, counts in counts_per_radius.items()
-#     }
-    
-#     return average_counts_per_radius 
-
 def src2tgt_mindist(src_centroids: np.ndarray,
                     tgt_centroids: np.ndarray) -> list[float]:
     """计算 src 粒子到 tgt 粒子最近距离 (N×M)"""
